@@ -20,6 +20,7 @@
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
+static char *fn_name;
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -37,6 +38,7 @@ process_execute (const char *file_name)
   if (fn_copy == NULL)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
+  strlcpy(fn_name, file_name, PGSIZE);
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
@@ -95,11 +97,13 @@ process_wait (tid_t child_tid UNUSED)
 void
 process_exit (void)
 {
+  // ADD EXIT CODE TO PRINT STATEMENT
+  printf("%s: exit()\n", fn_name);
   struct thread *cur = thread_current ();
   uint32_t *pd;
 
   /* Destroy the current process's page directory and switch back
-     to the kernel-only page directory. */
+     tco the kernel-only page directory. */
   pd = cur->pagedir;
   if (pd != NULL) 
     {
