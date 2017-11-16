@@ -222,7 +222,10 @@ load (const char *file_name, void (**eip) (void), void **esp)
   process_activate ();
 
   /* Open executable file. */
-  file = filesys_open (file_name);
+  // Create function name copy, so we can get the function name w/o args.
+  char *save_ptr;
+  char *true_file_name = strtok_r(file_name, " ", &save_ptr); 
+  file = filesys_open (true_file_name);
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", file_name);
@@ -302,7 +305,10 @@ load (const char *file_name, void (**eip) (void), void **esp)
     }
 
   /* Set up stack. */
-  if (!setup_stack (esp, file_name))
+  char addedSpace = " ";
+  strlcat(&addedSpace, save_ptr, strlen(save_ptr) + 2);
+  strlcat(file_name, save_ptr, strlen(save_ptr) + strlen(file_name) + 1);
+  if (!setup_stack (esp, true_file_name))
     goto done;
 
   /* Start address. */
@@ -437,14 +443,13 @@ setup_stack (void **esp, const char *file_name)
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success) {
-        *esp = PHYS_BASE - strlen(file_name);
+        *esp = PHYS_BASE;
         char *token, *save_ptr;
         for (token = strtok_r(file_name, " ", &save_ptr); token != NULL;
               token = strtok_r(NULL, " ", &save_ptr)) {
-          *esp += strlen(token);
+          *esp -= strlen(token) + 1;
           strlcpy((char*)*esp, token, strlen(token) + 1);
         }
-        *esp = PHYS_BASE - strlen(file_name);
       } else {
         palloc_free_page (kpage);
       }
