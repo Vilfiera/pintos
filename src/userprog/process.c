@@ -195,7 +195,7 @@ struct Elf32_Phdr
 #define PF_W 2          /* Writable. */
 #define PF_R 4          /* Readable. */
 
-static bool setup_stack (void **esp, const char *file_name);
+static bool setup_stack (void **esp);
 static bool validate_segment (const struct Elf32_Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
                           uint32_t read_bytes, uint32_t zero_bytes,
@@ -224,7 +224,9 @@ load (const char *file_name, void (**eip) (void), void **esp)
   /* Open executable file. */
   // Create function name copy, so we can get the function name w/o args.
   char *save_ptr;
-  char *true_file_name = strtok_r(file_name, " ", &save_ptr); 
+  char *temp_file_name = malloc(strlen(file_name));
+  strlcpy(temp_file_name, file_name, strlen(file_name)+1);
+  char *true_file_name = strtok_r(temp_file_name, " ", &save_ptr); 
   file = filesys_open (true_file_name);
   if (file == NULL) 
     {
@@ -305,12 +307,17 @@ load (const char *file_name, void (**eip) (void), void **esp)
     }
 
   /* Set up stack. */
-  char addedSpace = " ";
-  strlcat(&addedSpace, save_ptr, strlen(save_ptr) + 2);
-  strlcat(file_name, save_ptr, strlen(save_ptr) + strlen(file_name) + 1);
-  if (!setup_stack (esp, true_file_name))
+  if (!setup_stack (esp))
     goto done;
 
+  //push filename and args on the stack
+  char *token, *save_ptr2;
+  for (token = strtok_r(file_name, " ", &save_ptr2); token != NULL;
+  	token = strtok_r(NULL, " ", &save_ptr2)) 
+  {
+	*esp -= strlen(token) + 1;
+         strlcpy((char*)*esp, token, strlen(token) + 1);
+  }
   /* Start address. */
   *eip = (void (*) (void)) ehdr.e_entry;
 
@@ -321,7 +328,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
   file_close (file);
   return success;
 }
-
 /* load() helpers. */
 
 static bool install_page (void *upage, void *kpage, bool writable);
@@ -433,7 +439,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
 static bool
-setup_stack (void **esp, const char *file_name) 
+setup_stack (void **esp) 
 {
   uint8_t *kpage;
   bool success = false;
@@ -443,17 +449,12 @@ setup_stack (void **esp, const char *file_name)
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success) {
-        *esp = PHYS_BASE;
-        char *token, *save_ptr;
-        for (token = strtok_r(file_name, " ", &save_ptr); token != NULL;
-              token = strtok_r(NULL, " ", &save_ptr)) {
-          *esp -= strlen(token) + 1;
-          strlcpy((char*)*esp, token, strlen(token) + 1);
+        *esp = PHYS_BASE - 12;
         }
       } else {
         palloc_free_page (kpage);
       }
-    }
+    
   return success;
 }
 
