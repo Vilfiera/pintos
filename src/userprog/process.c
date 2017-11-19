@@ -310,14 +310,48 @@ load (const char *file_name, void (**eip) (void), void **esp)
   if (!setup_stack (esp))
     goto done;
 
+
   //push filename and args on the stack
   char *token, *save_ptr2;
+  int argsSize = 0;
+  int numArgs = 0;
   for (token = strtok_r(file_name, " ", &save_ptr2); token != NULL;
   	token = strtok_r(NULL, " ", &save_ptr2)) 
   {
-	*esp -= strlen(token) + 1;
-         strlcpy((char*)*esp, token, strlen(token) + 1);
+    int tokenSize = strlen(token) + 1;
+	  *esp -= tokenSize;
+    strlcpy((char*)*esp, token, tokenSize);
+    argsSize += tokenSize;
+    numArgs++;
   }
+
+  // Temporary stack ptr to scan for addresses.
+  void* tempStackPtr = *esp;
+
+  // Round down stack pointer to multiple of 4.
+  *esp -= 4 - (argsSize % 4);
+
+  *esp -= 4;
+//  strlcpy((char*)*esp, "hey\0", 4);
+
+  **(int**) esp = NULL;
+  
+  for (i = 0; i < numArgs; i++) {
+    *esp -= 4;
+    **(char***) esp = tempStackPtr;
+    tempStackPtr += strlen((char*) tempStackPtr) + 1;
+  }
+
+  tempStackPtr = *esp;
+  *esp -= 4;
+  **(char***) esp = tempStackPtr;
+
+  *esp -= 4;
+  **(int**) esp = numArgs;
+
+  *esp -= 4;
+  **(char***) esp = NULL;
+  
   /* Start address. */
   *eip = (void (*) (void)) ehdr.e_entry;
 
