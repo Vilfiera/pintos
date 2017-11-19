@@ -332,9 +332,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   *esp -= 4 - (argsSize % 4);
 
   *esp -= 4;
-//  strlcpy((char*)*esp, "hey\0", 4);
-
-  **(int**) esp = NULL;
+  **(char***) esp = NULL;
   
   for (i = 0; i < numArgs; i++) {
     *esp -= 4;

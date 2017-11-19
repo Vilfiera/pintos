@@ -4,8 +4,11 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "devices/shutdown.h"
+#include "filesys/off_t.h"
 
 static void syscall_handler (struct intr_frame *);
+
+bool create (const char *file, unsigned initial_size); 
 
 void
 syscall_init (void) 
@@ -17,6 +20,8 @@ static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
   uint32_t current_syscall = *((uint32_t *) f -> esp);
+  char *file;
+  off_t initial_size;
   switch(current_syscall)
   {
 	case SYS_HALT:
@@ -31,9 +36,11 @@ syscall_handler (struct intr_frame *f UNUSED)
 	case SYS_WAIT:
 		printf("wait/n");
 		break;
-	case SYS_CREATE:
-		printf("create/n");
-		break;
+  case SYS_CREATE:
+    file = *(char **) ((f -> esp) + 4);
+    initial_size = *(off_t*) ((f -> esp) + 8);
+  	create(file, initial_size);
+    break;
 	case SYS_REMOVE:
 		printf("remove/n");
 		break;
@@ -68,7 +75,7 @@ int wait (pid_t)
 }
 bool create (const char *file, unsigned initial_size) 
 {
-  printf("create/n");
+  return filesys_create(file, initial_size); 
 }
 bool remove (const char *file) 
 {
