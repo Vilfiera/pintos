@@ -104,7 +104,18 @@ struct thread
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
+
+   // next fd
+   int total_fd;
+   struct list fd_entries;
   };
+
+struct file_record
+{
+ struct file *cfile;
+ struct list_elem elem;
+ int fd;
+};
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.

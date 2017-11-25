@@ -80,11 +80,56 @@ syscall_handler (struct intr_frame *f UNUSED)
 		}
 		else thread_exit();
 		break;
+	case SYS_READ:
+		if (is_user_vaddr((char **) ((f -> esp) + 4)) && is_user_vaddr((char **) ((f -> esp) + 8)) && is_user_vaddr((char **) ((f -> esp) + 12)))
+		{
+			file = *(char **) ((f -> esp) + 4);
+			void *buf = *(void **) ((f -> esp) + 8);
+			unsigned size = *(unsigned*) ((f -> esp) + 12);
+			read (file, buf, size);
+		}
+		else thread_exit();
+		break;
+	case SYS_WRITE:
+		if (is_user_vaddr((char **) ((f -> esp) + 4)) && is_user_vaddr((char **) ((f -> esp) + 8)) && is_user_vaddr((char **) ((f -> esp) + 12)))
+		{
+			file = *(char **) ((f -> esp) + 4);
+			const void *buf = *(void **) ((f -> esp) + 8);
+			unsigned size = *(unsigned*) ((f -> esp) + 12);
+			write (file, buf, size);
+		}
+		else thread_exit();
+		break;
+	case SYS_SEEK:
+		if (is_user_vaddr((char **) ((f -> esp) + 4)) && is_user_vaddr((char **) ((f -> esp) + 8)))
+		{
+			int fd = *(int *) ((f -> esp) + 4);
+			unsigned pos = *(unsigned *) ((f -> esp) + 8);
+			seek (fd, pos);
+		}
+		else thread_exit();
+		break;
+	case SYS_TELL:
+		if (is_user_vaddr((char **) ((f -> esp) + 4)))
+		{
+			int fd = *(int *) ((f -> esp) + 4);
+			tell (fd);
+		}
+		else thread_exit();
+		break;
+	case SYS_CLOSE:
+		if (is_user_vaddr((char **) ((f -> esp) + 4)))
+		{
+			int fd = *(int *) ((f -> esp) + 4);
+			close (fd);
+		}
+		else thread_exit();
+		break;
 	default:	
 		printf("not\n");
 	
   }
-  thread_exit ();
+  thread_yield();
 }
 
 void halt (void) 
@@ -115,14 +160,17 @@ bool remove (const char *file)
 }
 int open (const char *file) 
 {
-  /*struct thread *t = thread_current();
-  struct file *currentFile = filesys_open (file);
-  if ( currentFile == NULL)
+  struct file_record *cfileRecord;
+  cfileRecord = malloc ( sizeof (struct file_record));
+  struct thread *t = thread_current();
+  struct file *currentfile = filesys_open (file);
+  if ( currentfile == NULL)
    return -1;
+  cfileRecord -> cfile = currentfile;
+  cfileRecord -> fd = t -> total_fd;
   t -> total_fd = t -> total_fd + 1;
-  currentFile -> fd = t -> total_fd;
-  list_push_back(&(t-> fd), &(currentFile->file_elem));
-  return total_fd;*/
+  list_push_back(&(t-> fd_entries), &(cfileRecord ->elem));
+  return cfileRecord -> fd;
 }
 int filesize (int fd) 
 {
@@ -133,81 +181,88 @@ int filesize (int fd)
   return -1;
 }
 int read (int fd, void *buffer, unsigned length) 
-{/*
+{
  if (fd != 0)
  {
-   struct thread *t = thread_current();
-   struct list *processfd = &(t -> fd);
-   struct file *tempfile;
+   struct file *tempfile = NULL;
    tempfile = file_ptr(fd);
-   if (tempfile != NULL)
- 	return file_read (tempfile, buffer, length);
-   return -1;
-   }
-   else{
+   /*if (tempfile == NULL)
+ 	return -1;*/
+   return file_read (tempfile, buffer, length);
+ }
+ else{
+        //need improvement
  	 input_getc();
- }*/
+	}
 }
 int write (int fd, const void *buffer, unsigned length)
 {
-/* if (fd != 1)
+if (fd != 1)
  {
   struct file *tempfile;
   tempfile = file_ptr(fd);
-  if (tempfile != NULL)
+  //if (tempfile != NULL)
  	return file_write (tempfile, buffer, length);
-  return -1;
+  //return -1;
  }
  else {
  	putbuf(buffer, length);
  }
-*/
+
 }
 void seek (int fd, unsigned position) 
 {
   struct file *tempfile;
   tempfile = file_ptr(fd);
-  if (tempfile != NULL)
+ // if (tempfile != NULL)
  	file_seek (tempfile, position);
 }
 unsigned tell (int fd) 
 {
   struct file *tempfile;
   tempfile = file_ptr(fd);
-  if (tempfile != NULL)
+  //if (tempfile != NULL)
  	return file_tell (tempfile);
-  return -1;
+  //return -1;
 }
 void close (int fd) 
 {
-   /*struct file *tempfile;
-   tempfile = file_ptr(fd);
-   if (tempfile != NULL)
+   struct thread *t = thread_current();
+   struct list *templist = &(t -> fd_entries);
+   struct file_record *tempfileRd;
+   struct list_elem *e;
+   for (e = list_begin (templist); e != list_end (templist);
+           e = list_next (e))
    {
-   struct list_elem *e = &tempfile -> file_elem;
-   file_close (tempfile);
-   list_remove(e);
-   }*/
+	  tempfileRd = list_entry(e,struct file_record, elem);
+	  if ( tempfileRd->fd == fd)
+	      {
+		file_close(tempfileRd -> cfile);
+		list_remove(e);
+		free(tempfileRd);
+		break;
+		}
+   }
 }
 
 struct file * file_ptr(int fd)
 {
-   /*struct thread *t = thread_current();
-   struct list processfd = t -> fd;
-   struct file *tempfile;
+   struct thread *t = thread_current();
+   struct list *templist = &(t -> fd_entries);
+   struct file_record *tempfileRd;
    struct list_elem *e;
-   for (e = list_begin (&foo_list); e != list_end (&foo_list);
+   for (e = list_begin (templist); e != list_end (templist);
            e = list_next (e))
    {
-	  tempfile = list_entry(e,struct file, elem);
-	  if ( tempfile->fd == fd)
+	  tempfileRd = list_entry(e,struct file_record, elem);
+	  if ( tempfileRd->fd == fd)
 	      {
-		return tempfile;
+		return tempfileRd -> cfile;
  	      }
    }
   thread_exit();
   return NULL;
-*/
+
 }
 
 
