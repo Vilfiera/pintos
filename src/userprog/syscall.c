@@ -9,6 +9,7 @@
 static void syscall_handler (struct intr_frame *);
 
 bool create (const char *file, unsigned initial_size); 
+bool remove (const char *file); 
 
 void
 syscall_init (void) 
@@ -42,8 +43,9 @@ syscall_handler (struct intr_frame *f UNUSED)
   	create(file, initial_size);
     break;
 	case SYS_REMOVE:
-		printf("remove/n");
-		break;
+		file = *(char **) ((f->esp) + 4);
+    remove(file);
+    break;
 	case SYS_OPEN:
 		printf("open/n");
 		break;
@@ -79,7 +81,7 @@ bool create (const char *file, unsigned initial_size)
 }
 bool remove (const char *file) 
 {
-  printf("remove/n");
+  return filesys_remove(file);
 }
 int open (const char *file) 
 {
