@@ -115,14 +115,14 @@ bool remove (const char *file)
 }
 int open (const char *file) 
 {
-  struct thread *t = thread_current();
+  /*struct thread *t = thread_current();
   struct file *currentFile = filesys_open (file);
   if ( currentFile == NULL)
    return -1;
   t -> total_fd = t -> total_fd + 1;
   currentFile -> fd = t -> total_fd;
   list_push_back(&(t-> fd), &(currentFile->file_elem));
-  return total_fd;
+  return total_fd;*/
 }
 int filesize (int fd) 
 {
@@ -180,19 +180,19 @@ unsigned tell (int fd)
 }
 void close (int fd) 
 {
-   struct file *tempfile;
+   /*struct file *tempfile;
    tempfile = file_ptr(fd);
    if (tempfile != NULL)
    {
    struct list_elem *e = &tempfile -> file_elem;
    file_close (tempfile);
    list_remove(e);
-   }
+   }*/
 }
 
 struct file * file_ptr(int fd)
 {
-   struct thread *t = thread_current();
+   /*struct thread *t = thread_current();
    struct list processfd = t -> fd;
    struct file *tempfile;
    struct list_elem *e;
@@ -207,6 +207,7 @@ struct file * file_ptr(int fd)
    }
   thread_exit();
   return NULL;
+*/
 }
 
 
