@@ -8,8 +8,6 @@
 
 static void syscall_handler (struct intr_frame *);
 
-bool create (const char *file, unsigned initial_size); 
-bool remove (const char *file); 
 
 void
 syscall_init (void) 
@@ -33,7 +31,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 		exit (f -> eax);
 		break;
 	case SYS_EXEC:
-		if (is_user_vaddr((char **) ((f -> esp) + 4))
+		if (is_user_vaddr((char **) ((f -> esp) + 4)))
 		{
 			file = *(char **) ((f -> esp) + 4);
 			exec (file);
@@ -41,9 +39,14 @@ syscall_handler (struct intr_frame *f UNUSED)
 		else thread_exit();
 		break;
 	case SYS_WAIT:
-		wait (pid_t);
+		
+		if (is_user_vaddr((char **) ((f -> esp) + 4)) && is_user_vaddr((char **) ((f -> esp) + 8)))
+		{
+      wait (*(pid_t*) ((f->esp) + 8));
+		}
+    else thread_exit();
 		break;
-  	case SYS_CREATE:
+  case SYS_CREATE:
 		if (is_user_vaddr((char **) ((f -> esp) + 4)) && is_user_vaddr((char **) ((f -> esp) + 8)))
 		{
     			file = *(char **) ((f -> esp) + 4);
@@ -90,13 +93,13 @@ void halt (void)
 }
 void exit (int status) 
 {
-  thread_current ()->return_value = status;
+//  thread_current ()->return_value = status;
   thread_exit ();
 }
 pid_t exec (const char *cmd_line) 
 {
  //return +ve value if success otherwise -1
- return process_execute(file);
+ return process_execute(cmd_line);
 }
 int wait (pid_t pid) 
 {
@@ -112,12 +115,12 @@ bool remove (const char *file)
 }
 int open (const char *file) 
 {
-  struct *t = thread_current();
-  struct *file currentFile = filesys_open (file);
+  struct thread *t = thread_current();
+  struct file *currentFile = filesys_open (file);
   if ( currentFile == NULL)
    return -1;
   t -> total_fd = t -> total_fd + 1;
-  currentfile -> fd = t -> total_fd;
+  currentFile -> fd = t -> total_fd;
   list_push_back(&(t-> fd), &(currentFile->file_elem));
   return total_fd;
 }
@@ -130,11 +133,11 @@ int filesize (int fd)
   return -1;
 }
 int read (int fd, void *buffer, unsigned length) 
-{
+{/*
  if (fd != 0)
  {
    struct thread *t = thread_current();
-   struct list processfd = t -> fd;
+   struct list *processfd = &(t -> fd);
    struct file *tempfile;
    tempfile = file_ptr(fd);
    if (tempfile != NULL)
@@ -143,11 +146,11 @@ int read (int fd, void *buffer, unsigned length)
    }
    else{
  	 input_getc();
- }
+ }*/
 }
 int write (int fd, const void *buffer, unsigned length)
 {
- if (fd != 1)
+/* if (fd != 1)
  {
   struct file *tempfile;
   tempfile = file_ptr(fd);
@@ -156,8 +159,9 @@ int write (int fd, const void *buffer, unsigned length)
   return -1;
  }
  else {
- 	putbuf();
+ 	putbuf(buffer, length);
  }
+*/
 }
 void seek (int fd, unsigned position) 
 {
