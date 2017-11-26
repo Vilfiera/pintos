@@ -9,7 +9,7 @@
 #include "threads/intr-stubs.h"
 #include "threads/palloc.h"
 #include "threads/switch.h"
-#include "threads/synch.h"
+
 #include "threads/vaddr.h"
 #ifdef USERPROG
 #include "userprog/process.h"
@@ -246,7 +246,15 @@ thread_create (const char *name, int priority,
   sf = alloc_frame (t, sizeof *sf);
   sf->eip = switch_entry;
   sf->ebp = 0;
-
+  #ifdef USERPROG
+  struct thread *parent = thread_current();
+  t -> parent = parent;
+  list_init(&(parent->childlist));
+  sema_init(&(parent->child_sema), 0);
+  struct child_record *cr = (struct child_record*) malloc(sizeof(struct child_record));
+  cr->child = t;
+  list_push_back(&(parent->childlist), &(cr->elem));
+  #endif
   /* Add to run queue. */
   thread_unblock (t);
 
@@ -498,11 +506,15 @@ is_thread (struct thread *t)
   return t != NULL && t->magic == THREAD_MAGIC;
 }
 
+bool isAlive(struct thread *t) {
+  return is_thread(t);
+}
 /* Does basic initialization of T as a blocked thread named
    NAME. */
-static void
+ void
 init_thread (struct thread *t, const char *name, int priority)
 {
+
   enum intr_level old_level;
 
   ASSERT (t != NULL);
@@ -519,6 +531,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t -> total_fd = 2;
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
+
   intr_set_level (old_level);
 }
 

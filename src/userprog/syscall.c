@@ -3,6 +3,7 @@
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "threads/synch.h"
 #include "devices/shutdown.h"
 #include "filesys/off_t.h"
 
@@ -28,6 +29,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 		halt();
 		break;
 	case SYS_EXIT:
+                
 		exit (f -> eax);
 		break;
 	case SYS_EXEC:
@@ -40,9 +42,9 @@ syscall_handler (struct intr_frame *f UNUSED)
 		break;
 	case SYS_WAIT:
 		
-		if (is_user_vaddr((char **) ((f -> esp) + 4)) && is_user_vaddr((char **) ((f -> esp) + 8)))
+		if (is_user_vaddr((char **) ((f -> esp) + 4)))
 		{
-      wait (*(pid_t*) ((f->esp) + 8));
+      wait (*(pid_t*) ((f->esp) + 4));
 		}
     else thread_exit();
 		break;
@@ -138,7 +140,26 @@ void halt (void)
 }
 void exit (int status) 
 {
-//  thread_current ()->return_value = status;
+  struct thread *t = thread_current();
+  if (isAlive(t->parent)) {
+    struct list *listOfParent = &(t->parent->childlist);
+    struct list_elem *e = list_begin(listOfParent);
+    while (e != list_end(listOfParent)) {
+	struct child_record *cr = list_entry(e, struct child_record, elem);
+	if (cr->child->tid == t->tid) {
+	  if (status == 1) {
+	  cr->retVal = -1;
+	  break;	
+	  }
+	  cr->retVal = status;
+	  break;
+	}
+	e = list_next(e);
+	}
+  }
+  printf("%s: exit(%d)\n", t->name, status);
+  if ( t->parent_wait)
+   sema_up(&(t->parent->child_sema));
   thread_exit ();
 }
 pid_t exec (const char *cmd_line) 
@@ -264,7 +285,6 @@ struct file * file_ptr(int fd)
   return NULL;
 
 }
-
 
 
 

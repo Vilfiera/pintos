@@ -88,7 +88,24 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-  return -1;
+  struct thread *t = thread_current();
+  struct list_elem *e;
+      for (e = list_begin (&(t->childlist)); e != list_end (&(t->childlist));
+           e = list_next (e))
+        { 
+	 struct child_record *cr = list_entry (e, struct child_record, elem);
+	 if (cr->child->tid == child_tid)
+	 {
+	  if (cr -> child -> parent_wait)
+		{
+		 return -1;
+		}
+	  cr->child->parent_wait = true;
+	  sema_down(& (t -> child_sema));
+	  return cr->retVal;
+ 	 }
+	}
+	return -1;
 }
 
 /* Free the current process's resources. */
