@@ -115,6 +115,7 @@ process_exit (void)
   struct thread *cur = thread_current ();
   uint32_t *pd;
 
+  /* TODO: FREE LIST of CHILDREN*/
   /* Destroy the current process's page directory and switch back
      tco the kernel-only page directory. */
   pd = cur->pagedir;
