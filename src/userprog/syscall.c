@@ -36,7 +36,8 @@ syscall_handler (struct intr_frame *f UNUSED)
 		if (is_user_vaddr((char **) ((f -> esp) + 4)))
 		{
 			file = *(char **) ((f -> esp) + 4);
-			exec (file);
+			/* TODO: SEMA DOWN TO WAIT FOR CHILD TO LOAD */
+      exec (file);
 		}
 		else thread_exit();
 		break;
@@ -145,17 +146,17 @@ void exit (int status)
     struct list *listOfParent = &(t->parent->childlist);
     struct list_elem *e = list_begin(listOfParent);
     while (e != list_end(listOfParent)) {
-	struct child_record *cr = list_entry(e, struct child_record, elem);
-	if (cr->child->tid == t->tid) {
-	  if (status == 1) {
-	  cr->retVal = -1;
-	  break;	
-	  }
-	  cr->retVal = status;
-	  break;
-	}
-	e = list_next(e);
-	}
+      struct child_record *cr = list_entry(e, struct child_record, elem);
+      if (cr->child->tid == t->tid) {
+        if (status == 1) {
+          cr->retVal = -1;
+          break;	
+        }
+        cr->retVal = status;
+        break;
+      }
+      e = list_next(e);
+    }
   }
   printf("%s: exit(%d)\n", t->name, status);
   if ( t->parent_wait)
@@ -207,12 +208,12 @@ int read (int fd, void *buffer, unsigned length)
  {
    struct file *tempfile = NULL;
    tempfile = file_ptr(fd);
-   /*if (tempfile == NULL)
- 	return -1;*/
+   if (tempfile == NULL) {
+ 	    return -1;
+  }
    return file_read (tempfile, buffer, length);
  }
  else{
-        //need improvement
  	 input_getc();
 	}
 }
@@ -222,9 +223,10 @@ if (fd != 1)
  {
   struct file *tempfile;
   tempfile = file_ptr(fd);
-  //if (tempfile != NULL)
+  if (tempfile == NULL) {
+    return -1;
+  }
  	return file_write (tempfile, buffer, length);
-  //return -1;
  }
  else {
  	putbuf(buffer, length);
@@ -235,16 +237,18 @@ void seek (int fd, unsigned position)
 {
   struct file *tempfile;
   tempfile = file_ptr(fd);
- // if (tempfile != NULL)
- 	file_seek (tempfile, position);
+ 	if (tempfile != NULL) {
+    file_seek (tempfile, position);
+  }
 }
 unsigned tell (int fd) 
 {
   struct file *tempfile;
   tempfile = file_ptr(fd);
-  //if (tempfile != NULL)
+  if (tempfile == NULL) {
+    return -1;
+  }
  	return file_tell (tempfile);
-  //return -1;
 }
 void close (int fd) 
 {
