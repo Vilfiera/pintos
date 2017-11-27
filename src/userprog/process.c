@@ -116,6 +116,14 @@ process_exit (void)
   uint32_t *pd;
 
   /* TODO: FREE LIST of CHILDREN*/
+/*
+  struct list *templist = &(cur -> childlist);
+  struct list_elem *e; 
+  while (!list_empty (templist)) {
+      struct list_elem *e = list_pop_front (templist);
+struct child_record *tempCR = list_entry(e, struct child_record, elem);
+        free(tempCR);
+  }*/
   /* Destroy the current process's page directory and switch back
      tco the kernel-only page directory. */
   pd = cur->pagedir;
@@ -374,6 +382,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   success = true;
 
  done:
+  free(temp_file_name);
   /* We arrive here whether the load is successful or not. */
   file_close (file);
   return success;

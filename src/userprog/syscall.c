@@ -6,131 +6,101 @@
 #include "threads/synch.h"
 #include "devices/shutdown.h"
 #include "filesys/off_t.h"
+#include "lib/string.h"
+
+/* Typical return values from main() and arguments to exit(). */
+#define EXIT_SUCCESS 0          /* Successful execution. */
+#define EXIT_FAILURE 1          /* Unsuccessful execution. */
+#define USER_VADDR_BOUND (void*) 0x08048000
+
+struct lock filesys_mutex;
 
 static void syscall_handler (struct intr_frame *);
 
+static void parse_args(void* esp, int* argBuf, int numToParse);
+static void valid_ptr(void* user_ptr);
+static void valid_buf(char* buf, unsigned size);
 
 void
 syscall_init (void) 
 {
+  lock_init(&filesys_mutex);
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
 static void
-syscall_handler (struct intr_frame *f UNUSED) 
+syscall_handler (struct intr_frame *f) 
 {
-  uint32_t current_syscall = *((uint32_t *) f -> esp);
-  char *file;
-  off_t initial_size;
-  int fd;
+  int args[3];
+  void* esp = f->esp;
+  valid_ptr(esp);
+  uint32_t current_syscall = *(uint32_t*)esp;
+  
   switch(current_syscall)
   {
 	case SYS_HALT:
 		halt();
 		break;
 	case SYS_EXIT:
-                
-		exit (f -> eax);
+    parse_args(esp, &args[0], 1);
+    exit ((int) args[0]);
 		break;
 	case SYS_EXEC:
-		if (is_user_vaddr((char **) ((f -> esp) + 4)))
-		{
-			file = *(char **) ((f -> esp) + 4);
+		parse_args(esp, &args[0], 1);
+    valid_ptr(args[0]);
 			/* TODO: SEMA DOWN TO WAIT FOR CHILD TO LOAD */
-      exec (file);
-		}
-		else thread_exit();
+    f->eax = exec ((const char*) args[0]);
 		break;
 	case SYS_WAIT:
-		
-		if (is_user_vaddr((char **) ((f -> esp) + 4)))
-		{
-      wait (*(pid_t*) ((f->esp) + 4));
-		}
-    else thread_exit();
+		parse_args(esp, &args[0], 1);
+    f->eax = wait ((pid_t) args[0]);
 		break;
   case SYS_CREATE:
-		if (is_user_vaddr((char **) ((f -> esp) + 4)) && is_user_vaddr((char **) ((f -> esp) + 8)))
-		{
-    			file = *(char **) ((f -> esp) + 4);
-    			initial_size = *(off_t*) ((f -> esp) + 8);
-  			create(file, initial_size);
-		}
-		else thread_exit();
-    		break;
+		parse_args(esp, &args[0], 2);
+    valid_ptr(args[0]);
+    valid_buf((char*)args[0], (unsigned)args[1]);
+    f->eax = create((const char*) args[0], (unsigned) args[1]);
+    break;
 	case SYS_REMOVE:
-		if (is_user_vaddr((char **) ((f -> esp) + 4)))
-		{
-			file = *(char **) ((f -> esp) + 4);
-			remove (file);
-		}
-		else thread_exit();
+		parse_args(esp, &args[0], 1);
+    valid_ptr(args[0]);
+    f->eax = remove ((const char*) args[0]);
 		break;
 	case SYS_OPEN:
-		if (is_user_vaddr((char **) ((f -> esp) + 4)))
-		{
-			file = *(char **) ((f -> esp) + 4);
-			open (file);
-		}
-		else thread_exit();
+		parse_args(esp, &args[0], 1);
+    valid_ptr(args[0]);
+    f->eax = open ((const char*) args[0]);
 		break;
 	case SYS_FILESIZE:
-		if (is_user_vaddr((char **) ((f -> esp) + 4)) && is_user_vaddr((char **) ((f -> esp) + 8)))
-		{
-			file = *(char **) ((f -> esp) + 4);
-			fd = *(int*) ((f -> esp) + 8);
-			filesize (fd);
-		}
-		else thread_exit();
+		parse_args(esp, &args[0], 1);
+    f->eax = filesize ((int) args[0]);
 		break;
 	case SYS_READ:
-		if (is_user_vaddr((char **) ((f -> esp) + 4)) && is_user_vaddr((char **) ((f -> esp) + 8)) && is_user_vaddr((char **) ((f -> esp) + 12)))
-		{
-			file = *(char **) ((f -> esp) + 4);
-			void *buf = *(void **) ((f -> esp) + 8);
-			unsigned size = *(unsigned*) ((f -> esp) + 12);
-			read (file, buf, size);
-		}
-		else thread_exit();
+		parse_args(esp, &args[0], 3);
+    valid_ptr(args[1]);
+    valid_buf((char*) args[1], (unsigned)args[2]);
+    f->eax = read ((int) args[0], (void*) args[1], (unsigned) args[2]);
 		break;
 	case SYS_WRITE:
-		if (is_user_vaddr((char **) ((f -> esp) + 4)) && is_user_vaddr((char **) ((f -> esp) + 8)) && is_user_vaddr((char **) ((f -> esp) + 12)))
-		{
-			file = *(char **) ((f -> esp) + 4);
-			const void *buf = *(void **) ((f -> esp) + 8);
-			unsigned size = *(unsigned*) ((f -> esp) + 12);
-			write (file, buf, size);
-		}
-		else thread_exit();
+		parse_args(esp, &args[0], 3);
+    valid_ptr(args[1]);
+    valid_buf((char*) args[1], (unsigned) args[2]);
+	  f->eax = write((int) args[0], (const void*) args[1], (unsigned) args[2]);
 		break;
 	case SYS_SEEK:
-		if (is_user_vaddr((char **) ((f -> esp) + 4)) && is_user_vaddr((char **) ((f -> esp) + 8)))
-		{
-			int fd = *(int *) ((f -> esp) + 4);
-			unsigned pos = *(unsigned *) ((f -> esp) + 8);
-			seek (fd, pos);
-		}
-		else thread_exit();
+		parse_args(esp, &args[0], 2);
+    seek ((int) args[0], (unsigned) args[1]);
 		break;
 	case SYS_TELL:
-		if (is_user_vaddr((char **) ((f -> esp) + 4)))
-		{
-			int fd = *(int *) ((f -> esp) + 4);
-			tell (fd);
-		}
-		else thread_exit();
+		parse_args(esp, &args[0], 1);
+    f->eax = tell ((int) args[0]);
 		break;
 	case SYS_CLOSE:
-		if (is_user_vaddr((char **) ((f -> esp) + 4)))
-		{
-			int fd = *(int *) ((f -> esp) + 4);
-			close (fd);
-		}
-		else thread_exit();
+		parse_args(esp, &args[0], 1);
+    close ((int) args[0]);
 		break;
 	default:	
-		printf("not\n");
-	
+    exit(-1);	
   }
   thread_yield();
 }
@@ -158,6 +128,8 @@ void exit (int status)
       e = list_next(e);
     }
   }
+  char *save_ptr;
+  char *file_name = strtok_r(t->name, " ", &save_ptr); 
   printf("%s: exit(%d)\n", t->name, status);
   if ( t->parent_wait)
    sema_up(&(t->parent->child_sema));
@@ -174,84 +146,121 @@ int wait (pid_t pid)
 }
 bool create (const char *file, unsigned initial_size) 
 {
-  return filesys_create(file, initial_size); 
+  lock_acquire(&filesys_mutex);
+  bool result = filesys_create(file, initial_size); 
+  lock_release(&filesys_mutex);
+  return result;
 }
 bool remove (const char *file) 
 {
-  return filesys_remove(file);
+
+  lock_acquire(&filesys_mutex);
+  bool result = filesys_remove(file);
+  lock_release(&filesys_mutex);
+  return result;
 }
 int open (const char *file) 
 {
+  
+  lock_acquire(&filesys_mutex);
   struct file_record *cfileRecord;
   cfileRecord = malloc ( sizeof (struct file_record));
   struct thread *t = thread_current();
   struct file *currentfile = filesys_open (file);
-  if ( currentfile == NULL)
-   return -1;
+  if ( currentfile == NULL) {
+    lock_release(&filesys_mutex);
+    return -1;
+  }
   cfileRecord -> cfile = currentfile;
   cfileRecord -> fd = t -> total_fd;
   t -> total_fd = t -> total_fd + 1;
   list_push_back(&(t-> fd_entries), &(cfileRecord ->elem));
-  return cfileRecord -> fd;
+  int result = cfileRecord -> fd;
+  lock_release(&filesys_mutex);
+  return result;
 }
 int filesize (int fd) 
 {
+  lock_acquire(&filesys_mutex);
   struct file *tempfile;
   tempfile = file_ptr(fd);
-  if (tempfile != NULL)
+  if (tempfile != NULL) {
+    lock_release(&filesys_mutex);
   	return file_length(tempfile);
+  }
+  lock_release(&filesys_mutex);
   return -1;
 }
 int read (int fd, void *buffer, unsigned length) 
 {
+ lock_acquire(&filesys_mutex);
  if (fd != 0)
  {
    struct file *tempfile = NULL;
    tempfile = file_ptr(fd);
    if (tempfile == NULL) {
+      lock_release(&filesys_mutex);
  	    return -1;
-  }
-   return file_read (tempfile, buffer, length);
+   }
+    lock_release(&filesys_mutex);
+    return file_read (tempfile, buffer, length);
  }
  else{
- 	 input_getc();
+    int bytesRead = 0;
+    while (bytesRead < length) {
+ 	    input_getc();
+      bytesRead++;
+    }
+    lock_release(&filesys_mutex);
+    return bytesRead; 
 	}
 }
 int write (int fd, const void *buffer, unsigned length)
 {
+lock_acquire(&filesys_mutex);
 if (fd != 1)
  {
   struct file *tempfile;
   tempfile = file_ptr(fd);
   if (tempfile == NULL) {
+    lock_release(&filesys_mutex);
     return -1;
   }
+  lock_release(&filesys_mutex);
  	return file_write (tempfile, buffer, length);
  }
  else {
- 	putbuf(buffer, length);
+  lock_release(&filesys_mutex);
+  putbuf(buffer, length);
+  return length;
  }
 
 }
 void seek (int fd, unsigned position) 
 {
+  lock_acquire(&filesys_mutex);
   struct file *tempfile;
   tempfile = file_ptr(fd);
  	if (tempfile != NULL) {
     file_seek (tempfile, position);
   }
+  lock_release(&filesys_mutex);
 }
 unsigned tell (int fd) 
 {
+  lock_acquire(&filesys_mutex);
   struct file *tempfile;
   tempfile = file_ptr(fd);
   if (tempfile == NULL) {
+    lock_release(&filesys_mutex);
     return -1;
   }
+  lock_release(&filesys_mutex);
  	return file_tell (tempfile);
 }
 void close (int fd) 
 {
+  lock_acquire(&filesys_mutex);
    struct thread *t = thread_current();
    struct list *templist = &(t -> fd_entries);
    struct file_record *tempfileRd;
@@ -268,6 +277,7 @@ void close (int fd)
 		break;
 		}
    }
+  lock_release(&filesys_mutex);
 }
 
 struct file * file_ptr(int fd)
@@ -290,9 +300,26 @@ struct file * file_ptr(int fd)
 
 }
 
+static void parse_args(void* esp, int* argBuf, int numToParse) {
+  int i;
+  for (i = 0; i < numToParse; i++) {
+    valid_ptr(esp + ((i + 1) * 4));
+    argBuf[i] = *(int*) (esp + ((i + 1) * 4));
+  }
+} 
 
+static void valid_ptr(void* user_ptr) {
+  if (!(is_user_vaddr(user_ptr) && user_ptr > USER_VADDR_BOUND)) {
+    exit(-1);
+  }
+}
 
-
+static void valid_buf(char* buf, unsigned size) {
+  int i;
+  for (i = 0; i < size; i++) {
+    valid_ptr(&buf[i]);
+  }
+}
 
 
 
