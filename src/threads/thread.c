@@ -231,7 +231,6 @@ thread_create (const char *name, int priority,
   /* Initialize thread. */
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
-
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame (t, sizeof *kf);
   kf->eip = NULL;
@@ -249,8 +248,6 @@ thread_create (const char *name, int priority,
   #ifdef USERPROG
   struct thread *parent = thread_current();
   t -> parent = parent;
-  list_init(&(parent->childlist));
-  sema_init(&(parent->child_sema), 0);
   struct child_record *cr = (struct child_record*) malloc(sizeof(struct child_record));
   cr->child = t;
   cr->id = t->tid;
@@ -535,7 +532,9 @@ init_thread (struct thread *t, const char *name, int priority)
   t -> total_fd = 2;
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
-
+  sema_init(&(t->child_load_sema), 0);
+  list_init(&(t->childlist));
+  sema_init(&(t->child_sema), 0);
   intr_set_level (old_level);
 }
 

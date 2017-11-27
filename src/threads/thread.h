@@ -86,6 +86,8 @@ struct thread
     bool parent_wait;
     // wait for child
     struct semaphore child_sema;
+    // waits for child to load
+    struct semaphore child_load_sema;
     //children list
     struct list childlist;
     // parent reference

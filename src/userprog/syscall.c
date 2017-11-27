@@ -20,7 +20,7 @@ static void syscall_handler (struct intr_frame *);
 static void parse_args(void* esp, int* argBuf, int numToParse);
 static void valid_ptr(void* user_ptr);
 static void valid_buf(char* buf, unsigned size);
-
+static void valid_string(void* string);
 void
 syscall_init (void) 
 {
@@ -48,6 +48,7 @@ syscall_handler (struct intr_frame *f)
 	case SYS_EXEC:
 		parse_args(esp, &args[0], 1);
     valid_ptr(args[0]);
+    valid_string((void*) args[0]);
 			/* TODO: SEMA DOWN TO WAIT FOR CHILD TO LOAD */
     f->eax = exec ((const char*) args[0]);
 		break;
@@ -59,16 +60,19 @@ syscall_handler (struct intr_frame *f)
 		parse_args(esp, &args[0], 2);
     valid_ptr(args[0]);
     valid_buf((char*)args[0], (unsigned)args[1]);
+    valid_string((void*) args[0]);
     f->eax = create((const char*) args[0], (unsigned) args[1]);
     break;
 	case SYS_REMOVE:
 		parse_args(esp, &args[0], 1);
     valid_ptr(args[0]);
+    valid_string((void*) args[0]);
     f->eax = remove ((const char*) args[0]);
 		break;
 	case SYS_OPEN:
 		parse_args(esp, &args[0], 1);
     valid_ptr(args[0]);
+    valid_string((void*) args[0]);
     f->eax = open ((const char*) args[0]);
 		break;
 	case SYS_FILESIZE:
@@ -123,6 +127,7 @@ void exit (int status)
           break;	
         }
         cr->retVal = status;
+        cr->child = NULL; 
         break;
       }
       e = list_next(e);
@@ -138,7 +143,9 @@ void exit (int status)
 pid_t exec (const char *cmd_line) 
 {
  //return +ve value if success otherwise -1
- return process_execute(cmd_line);
+  int result = process_execute(cmd_line);
+  sema_down(&(thread_current()->child_load_sema));
+  return result;
 }
 int wait (pid_t pid) 
 {
@@ -194,6 +201,10 @@ int filesize (int fd)
 int read (int fd, void *buffer, unsigned length) 
 {
  lock_acquire(&filesys_mutex);
+  if (fd == 1) {
+    lock_release(&filesys_mutex);
+    return -1;
+  }
  if (fd != 0)
  {
    struct file *tempfile = NULL;
@@ -218,6 +229,10 @@ int read (int fd, void *buffer, unsigned length)
 int write (int fd, const void *buffer, unsigned length)
 {
 lock_acquire(&filesys_mutex);
+  if (fd == 0) {
+    lock_release(&filesys_mutex);
+    return -1;
+  }
 if (fd != 1)
  {
   struct file *tempfile;
@@ -286,6 +301,8 @@ struct file * file_ptr(int fd)
    struct list *templist = &(t -> fd_entries);
    struct file_record *tempfileRd;
    struct list_elem *e;
+   if (list_empty(templist))
+      return NULL;
    for (e = list_begin (templist); e != list_end (templist);
            e = list_next (e))
    {
@@ -321,5 +338,13 @@ static void valid_buf(char* buf, unsigned size) {
   }
 }
 
-
+static void valid_string(void* string) {
+  valid_ptr(string);
+  char nullTerm = *(char*)string;
+  while (nullTerm != '\0') {
+    string++;
+    valid_ptr(string);
+    nullTerm = *(char*)string;
+  }
+}
 
