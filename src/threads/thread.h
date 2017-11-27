@@ -128,6 +128,8 @@ struct child_record
 {
  int retVal;
  struct thread *child;
+ int id;
+ bool waiting;
  struct list_elem elem; 
 };
 

@@ -94,16 +94,23 @@ process_wait (tid_t child_tid UNUSED)
 {
   struct thread *t = thread_current();
   struct list_elem *e;
-      for (e = list_begin (&(t->childlist)); e != list_end (&(t->childlist));
+  if (list_empty(&(t->childlist))) {
+    return -1;
+  }
+  for (e = list_begin (&(t->childlist)); e != list_end (&(t->childlist));
            e = list_next (e))
-        { 
+    { 
 	 struct child_record *cr = list_entry (e, struct child_record, elem);
-	 if (cr->child->tid == child_tid)
+/*TODO:*/	 if (cr->id == child_tid)
 	 {
-	  if (cr -> child -> parent_wait)
+	  if (cr -> waiting)
 		{
 		 return -1;
 		}
+    cr->waiting = true;
+    if (cr->child == NULL) {
+      return cr->retVal;
+    }
 	  cr->child->parent_wait = true;
 	  sema_down(& (t -> child_sema));
 	  return cr->retVal;
