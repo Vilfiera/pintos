@@ -122,7 +122,7 @@ void exit (int status)
     struct list_elem *e = list_begin(listOfParent);
     while (e != list_end(listOfParent)) {
       struct child_record *cr = list_entry(e, struct child_record, elem);
-      if (cr->child->tid == t->tid) {
+      if (cr->id == t->tid) {
         if (status == 1) {
           cr->retVal = -1;
           break;	
