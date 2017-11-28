@@ -21,6 +21,7 @@ static void parse_args(void* esp, int* argBuf, int numToParse);
 static void valid_ptr(void* user_ptr);
 static void valid_buf(char* buf, unsigned size);
 static void valid_string(void* string);
+
 void
 syscall_init (void) 
 {
@@ -326,7 +327,8 @@ static void parse_args(void* esp, int* argBuf, int numToParse) {
 } 
 
 static void valid_ptr(void* user_ptr) {
-  if (!(is_user_vaddr(user_ptr) && user_ptr > USER_VADDR_BOUND)) {
+  if (!(is_user_vaddr(user_ptr) && user_ptr > USER_VADDR_BOUND
+        && (pagedir_get_page(thread_current()->pagedir, user_ptr) != NULL))) {
     exit(-1);
   }
 }
@@ -340,11 +342,9 @@ static void valid_buf(char* buf, unsigned size) {
 
 static void valid_string(void* string) {
   valid_ptr(string);
-  char nullTerm = *(char*)string;
-  while (nullTerm != '\0') {
+  while (*(uint8_t*)string != '\0') {
     string++;
     valid_ptr(string);
-    nullTerm = *(char*)string;
   }
 }
 
