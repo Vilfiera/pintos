@@ -135,7 +135,6 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
-
   /* TODO: FREE LIST of CHILDREN*/
 /*
   struct list *templist = &(cur -> childlist);
@@ -275,12 +274,14 @@ load (const char *file_name, void (**eip) (void), void **esp)
   strlcpy(temp_file_name, file_name, strlen(file_name)+1);
   char *true_file_name = strtok_r(temp_file_name, " ", &save_ptr); 
   file = filesys_open (true_file_name);
+  
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", file_name);
       goto done; 
     }
-
+   t -> exefile = file;
+   file_deny_write(t -> exefile);
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
       || memcmp (ehdr.e_ident, "\177ELF\1\1\1", 7)
@@ -362,11 +363,11 @@ load (const char *file_name, void (**eip) (void), void **esp)
   *eip = (void (*) (void)) ehdr.e_entry;
 
   success = true;
-
+  
  done:
   free(temp_file_name);
   /* We arrive here whether the load is successful or not. */
-  file_close (file);
+  //file_close (file);
   return success;
 }
 /* load() helpers. */

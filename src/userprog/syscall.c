@@ -139,6 +139,7 @@ void exit (int status)
   printf("%s: exit(%d)\n", t->name, status);
   if ( t->parent_wait)
    sema_up(&(t->parent->child_sema));
+  file_close (t->exefile);
   thread_exit ();
 }
 pid_t exec (const char *cmd_line) 
