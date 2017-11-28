@@ -49,6 +49,7 @@ process_execute (const char *file_name)
   if (tid == TID_ERROR) {
     palloc_free_page (fn_copy); 
   }
+  free(temp_file_name);
   sema_up(&(parent->child_load_sema));
   return tid;
 }
@@ -236,7 +237,7 @@ struct Elf32_Phdr
 #define PF_W 2          /* Writable. */
 #define PF_R 4          /* Readable. */
 
-static bool setup_stack (void **esp);
+static bool setup_stack (void **esp, const char* file_name);
 static bool validate_segment (const struct Elf32_Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
                           uint32_t read_bytes, uint32_t zero_bytes,
@@ -348,49 +349,10 @@ load (const char *file_name, void (**eip) (void), void **esp)
     }
 
   /* Set up stack. */
-  if (!setup_stack (esp))
+  if (!setup_stack (esp, file_name))
     goto done;
 
 
-  //push filename and args on the stack
-  char *token, *save_ptr2;
-  int argsSize = 0;
-  int numArgs = 0;
-  for (token = strtok_r(file_name, " ", &save_ptr2); token != NULL;
-  	token = strtok_r(NULL, " ", &save_ptr2)) 
-  {
-    int tokenSize = strlen(token) + 1;
-	  *esp -= tokenSize;
-    strlcpy((char*)*esp, token, tokenSize);
-    argsSize += tokenSize;
-    numArgs++;
-  }
-
-  // Temporary stack ptr to scan for addresses.
-  void* tempStackPtr = *esp;
-
-  // Round down stack pointer to multiple of 4.
-  *esp -= 4 - (argsSize % 4);
-
-  *esp -= 4;
-  **(char***) esp = NULL;
-  
-  for (i = 0; i < numArgs; i++) {
-    *esp -= 4;
-    **(char***) esp = tempStackPtr;
-    tempStackPtr += strlen((char*) tempStackPtr) + 1;
-  }
-
-  tempStackPtr = *esp;
-  *esp -= 4;
-  **(char***) esp = tempStackPtr;
-
-  *esp -= 4;
-  **(int**) esp = numArgs;
-
-  *esp -= 4;
-  **(char***) esp = NULL;
-  
   /* Start address. */
   *eip = (void (*) (void)) ehdr.e_entry;
 
@@ -513,7 +475,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
 static bool
-setup_stack (void **esp) 
+setup_stack (void **esp, const char* file_name) 
 {
   uint8_t *kpage;
   bool success = false;
@@ -528,7 +490,48 @@ setup_stack (void **esp)
       } else {
         palloc_free_page (kpage);
       }
-    
+  //push filename and args on the stack
+  char *token, *save_ptr2;
+  int argsSize = 0;
+  int numArgs = 0;
+  for (token = strtok_r(file_name, " ", &save_ptr2); token != NULL;
+  	token = strtok_r(NULL, " ", &save_ptr2)) 
+  {
+    int tokenSize = strlen(token) + 1;
+	  *esp -= tokenSize;
+    strlcpy((char*)*esp, token, tokenSize);
+    argsSize += tokenSize;
+    numArgs++;
+    if (argsSize > 4096) {
+      break;
+    } 
+  }
+
+  // Temporary stack ptr to scan for addresses.
+  void* tempStackPtr = *esp;
+
+  // Round down stack pointer to multiple of 4.
+  *esp -= 4 - (argsSize % 4);
+
+  *esp -= 4;
+  **(char***) esp = NULL;
+  int i; 
+  for (i = 0; i < numArgs; i++) {
+    *esp -= 4;
+    **(char***) esp = tempStackPtr;
+    tempStackPtr += strlen((char*) tempStackPtr) + 1;
+  }
+
+  tempStackPtr = *esp;
+  *esp -= 4;
+  **(char***) esp = tempStackPtr;
+
+  *esp -= 4;
+  **(int**) esp = numArgs;
+
+  *esp -= 4;
+  **(char***) esp = NULL;
+  
   return success;
 }
 
