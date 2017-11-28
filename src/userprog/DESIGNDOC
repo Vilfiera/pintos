@@ -75,8 +75,13 @@ multiple executables by piping with '|'.
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
+IN SYSCALL.C:
 struct lock filesys_mutex;
 This is used for synchronization regarding file i/o system calls.
+
+IN THREAD.H:
+struct file *exefile
+This is used to deny writes to a file being used as an executable.
 
 bool parent_wait
 This is used to tell a child process that it needs to inform its parent
@@ -128,10 +133,33 @@ that would result in the kernel waiting forever for input.
 >> (e.g. calls to pagedir_get_page()) that might result?  What about
 >> for a system call that only copies 2 bytes of data?  Is there room
 >> for improvement in these numbers, and how much?
-The worst possible case is that 
+The least number of inspections is 1, if the first address that we check
+is located in the kernel address space and is deemed invalid. This will
+kill the current thread trying to access the illegal memory. The greatest
+number of inspections is 4096, where we have to check every single address
+to ensure that it is legal to access. 
+For a system call that only copies two bytes, the least is 1 and the
+greatest is 2, for the same reason as above.
+As for room for improvement, these numbers could be reduced to a maximum
+of two page table inspections. However, this would only occur in the
+case where the kernel already knows how large the data is, before
+beginning to copy it. There might be cases where the user keeps copying
+1 byte of data, until they try to copy the final byte into an illegal
+address. In this case, we cannot reduce these numbers because we need
+to check every address from the user.
 
 >> B5: Briefly describe your implementation of the "wait" system call
 >> and how it interacts with process termination.
+Our wait system call keeps track of a list of child processes, ensuring
+that a process can only wait for its children. When a child process
+terminates, it checks if its parent is still running. If so, it updates
+the information in its parent's child list, so that the parent
+can access its return status even after the child has exited. A child
+process also checks if its parent is currently waiting for it, in which
+case it will sema_up its parent's semaphore to signal that it is done.
+Parent processes check if their children are dead. If so, then they
+retrieve their dead child's return status from their child list. Otherwise,
+they will wait for their semaphore to be incremented before proceeding.
 
 >> B6: Any access to user program memory at a user-specified address
 >> can fail due to a bad pointer value.  Such accesses must cause the
@@ -147,12 +175,41 @@ The worst possible case is that
 >> paragraphs, describe the strategy or strategies you adopted for
 >> managing these issues.  Give an example.
 
+To combat having a mess of memory access checking, we factored out a lot
+of checks into separate functions. For instance, the parse_args() function
+also checks if the stack pointer is a valid address. Other functions, like
+valid_ptr, valid_buf, and valid_string, are all called together before
+a system call's important code is executed -- making it obvious what
+our code is doing before moving on to actually executing a system call.
+
+When an error is detected, we either return an error value (i.e. -1) or
+use the exit system call. In the exit system call, we free all resources
+that were allocated, such as the child list entries and the fd list entries.
+Note that the fd list entries are not explicitly freed in the exit system
+call, because close() is explicitly called for each fd when a process
+exits. 
+
+A strategy we used to keep track of what resources to free was to
+use TODOs in our code, reminding us of times that we allocated resources.
+This meant that when we looked over our code, we were reminded
+that we needed to free these resources when the process terminated. This
+was really helpful since we added multiple allocated resources over the
+development process.
+
 ---- SYNCHRONIZATION ----
 
 >> B7: The "exec" system call returns -1 if loading the new executable
 >> fails, so it cannot return before the new executable has completed
 >> loading.  How does your code ensure this?  How is the load
 >> success/failure status passed back to the thread that calls "exec"?
+
+In our thread structure, we have a semaphore used to indicate
+whether the child is done loading or not, and an integer representing
+its load status. Since the parent waits for its child to sema_up the
+semaphore, it waits for the child to finish loading. After this,
+it checks the child's status -- if it was updated to -1, then the parent
+knows the child did not successfully load. If it was updated to 1, then
+the parent knows the child was successful.
 
 >> B8: Consider parent process P with child process C.  How do you
 >> ensure proper synchronization and avoid race conditions when P
@@ -161,16 +218,58 @@ The worst possible case is that
 >> terminates without waiting, before C exits?  After C exits?  Are
 >> there any special cases?
 
+If P waits for C before C exits, then it will wait for a semaphore
+to be incremented by C. This is done in exit(), where C will check
+if its parent P is waiting, and increment the semaphore if so. If P
+waits for C after C exits, then we have a list of children and their
+exit statuses inside P's struct thread that we can check.
+
+To ensure resources are freed, we consider each thread responsible
+for its own struct thread. This means that allocated structures such
+as a thread's child list or fd list are all freed by the thread
+once it exits. We also synchronize processes so that a parent will
+wait for its child to load before proceeding.
+
+If P terminates without waiting before C exits, then C will see that
+its parent thread is dead once it checks. This means that c will exit
+without worrying about updating its parent. If P terminates without
+waiting after C exits, then there are no problems as neither P nor C
+were waiting for the other process and thus do not have to provide info
+to the other process.
+
 ---- RATIONALE ----
 
 >> B9: Why did you choose to implement access to user memory from the
 >> kernel in the way that you did?
 
+Having a separate function made it a lot easier to understand what
+we were doing, and prevented a lot of code reusing. We decided to
+implement user memory access by checking the pointer's validity first
+(i.e. checking if it was a user address and if it was in the pagedir),
+since it was much easier for us. The other way did have the advantage
+of faster runtimes, but we had issues implementing it.
+
 >> B10: What advantages or disadvantages can you see to your design
 >> for file descriptors?
 
+Our design for file descriptors makes it very easy to check if a process
+can read from a given fd or not -- we just check its list of files. It
+was also fairly easy to implement, since we used the existing list
+implementation in the provided code. Freeing the list was also very simple,
+since close() frees each fd and close() is called implicitly when a
+process ends.
+
+One disadvantage was that we had to allocate memory for the fd list, which
+could cause a problem if a process wants to open a lot of files at once.
+Another disadvantage is the slow lookup time for an fd, as we have to
+traverse a linked list to see whether an fd is valid to read from or not.
+This adds a lot of overhead runtime that we would rather not have.
+
 >> B11: The default tid_t to pid_t mapping is the identity mapping.
 >> If you changed it, what advantages are there to your approach?
+
+We did not change it; we found that it worked just fine for our
+purposes.
 
 			   SURVEY QUESTIONS
 			   ================
