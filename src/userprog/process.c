@@ -35,6 +35,7 @@ process_execute (const char *file_name)
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
   if (fn_copy == NULL) {
+    parent->child_status = -1;
     sema_up(&(parent->child_load_sema));
     return TID_ERROR;
   }
@@ -48,9 +49,8 @@ process_execute (const char *file_name)
   tid = thread_create (true_file_name, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR) {
     palloc_free_page (fn_copy); 
-  }
+  } 
   free(temp_file_name);
-  sema_up(&(parent->child_load_sema));
   return tid;
 }
 
@@ -69,7 +69,12 @@ start_process (void *file_name_)
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
-
+  if (!success) {
+    thread_current()->parent->child_status = -1;
+  } else {
+    thread_current()->parent->child_status = 1;
+  }
+  sema_up(&(thread_current()->parent->child_load_sema));
   /* If load failed, quit. */
   palloc_free_page (file_name);
   if (!success) 
@@ -106,7 +111,7 @@ process_wait (tid_t child_tid UNUSED)
            e = list_next (e))
     { 
 	 struct child_record *cr = list_entry (e, struct child_record, elem);
-/*TODO:*/	 if (cr->id == child_tid)
+	 if (cr->id == child_tid)
 	 {
 	  if (cr -> waiting)
 		{
@@ -498,13 +503,13 @@ setup_stack (void **esp, const char* file_name)
   	token = strtok_r(NULL, " ", &save_ptr2)) 
   {
     int tokenSize = strlen(token) + 1;
+    if (argsSize + tokenSize > 4096) {
+      break;
+    }
 	  *esp -= tokenSize;
     strlcpy((char*)*esp, token, tokenSize);
     argsSize += tokenSize;
     numArgs++;
-    if (argsSize > 4096) {
-      break;
-    } 
   }
 
   // Temporary stack ptr to scan for addresses.

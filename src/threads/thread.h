@@ -84,6 +84,8 @@ struct thread
   {
     //bool parent waiting
     bool parent_wait;
+    // tracks status of child when loading.
+    int child_status;
     // wait for child
     struct semaphore child_sema;
     // waits for child to load

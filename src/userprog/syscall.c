@@ -146,6 +146,9 @@ pid_t exec (const char *cmd_line)
  //return +ve value if success otherwise -1
   int result = process_execute(cmd_line);
   sema_down(&(thread_current()->child_load_sema));
+  if (thread_current()->child_status == -1) {
+    return -1;
+  }
   return result;
 }
 int wait (pid_t pid) 
@@ -214,8 +217,9 @@ int read (int fd, void *buffer, unsigned length)
       lock_release(&filesys_mutex);
  	    return -1;
    }
+    int result = file_read (tempfile, buffer, length);
     lock_release(&filesys_mutex);
-    return file_read (tempfile, buffer, length);
+    return result;
  }
  else{
     int bytesRead = 0;
@@ -242,12 +246,13 @@ if (fd != 1)
     lock_release(&filesys_mutex);
     return -1;
   }
+ 	int result = file_write (tempfile, buffer, length);
   lock_release(&filesys_mutex);
- 	return file_write (tempfile, buffer, length);
+  return result;
  }
  else {
-  lock_release(&filesys_mutex);
   putbuf(buffer, length);
+  lock_release(&filesys_mutex);
   return length;
  }
 
@@ -271,8 +276,9 @@ unsigned tell (int fd)
     lock_release(&filesys_mutex);
     return -1;
   }
+  unsigned result = file_tell(tempfile);
   lock_release(&filesys_mutex);
- 	return file_tell (tempfile);
+  return result;
 }
 void close (int fd) 
 {
