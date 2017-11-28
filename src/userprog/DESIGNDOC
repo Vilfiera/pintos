@@ -105,6 +105,27 @@ struct thread *parent
 Used to access the parent thread's childlist, updating its values.
 Used in exit() and exec().
 
+struct file_record
+{
+ struct file *cfile;
+ struct list_elem elem;
+ int fd;
+};
+Used in a struct list to keep track of all files that a process has open.
+Used in all file i/o system calls.
+
+struct child_record
+{
+ int retVal;
+ struct thread *child;
+ int id;
+ bool waiting;
+ struct list_elem elem; 
+};
+Used in a struct list to keep track of all children processes of a process.
+Used in wait().
+
+
 >> B2: Describe how file descriptors are associated with open files.
 >> Are file descriptors unique within the entire OS or just within a
 >> single process?

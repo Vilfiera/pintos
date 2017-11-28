@@ -35,14 +35,18 @@ process_execute (const char *file_name)
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
   if (fn_copy == NULL) {
-    parent->child_status = -1;
     sema_up(&(parent->child_load_sema));
     return TID_ERROR;
   }
   strlcpy (fn_copy, file_name, PGSIZE);
  //extract true filename
-   char *save_ptr;
-   char *temp_file_name = malloc(strlen(file_name));
+  char *save_ptr;
+  char *temp_file_name = malloc(strlen(file_name)+1);
+  if (temp_file_name == NULL) {
+    palloc_free_page(fn_copy);
+    sema_up(&(parent->child_load_sema));
+    return TID_ERROR;
+  }
   strlcpy(temp_file_name, file_name, strlen(file_name)+1);
   char *true_file_name = strtok_r(temp_file_name, " ", &save_ptr); 
   /* Create a new thread to execute FILE_NAME. */
@@ -135,15 +139,6 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
-  /* TODO: FREE LIST of CHILDREN*/
-/*
-  struct list *templist = &(cur -> childlist);
-  struct list_elem *e; 
-  while (!list_empty (templist)) {
-      struct list_elem *e = list_pop_front (templist);
-struct child_record *tempCR = list_entry(e, struct child_record, elem);
-        free(tempCR);
-  }*/
   /* Destroy the current process's page directory and switch back
      tco the kernel-only page directory. */
   pd = cur->pagedir;
@@ -263,14 +258,17 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
-  if (t->pagedir == NULL) 
+  if (t->pagedir == NULL) {
     goto done;
+  }
   process_activate ();
 
   /* Open executable file. */
   // Create function name copy, so we can get the function name w/o args.
   char *save_ptr;
-  char *temp_file_name = malloc(strlen(file_name));
+  char *temp_file_name = malloc(strlen(file_name)+1);
+  if (temp_file_name == NULL)
+    return false;
   strlcpy(temp_file_name, file_name, strlen(file_name)+1);
   char *true_file_name = strtok_r(temp_file_name, " ", &save_ptr); 
   file = filesys_open (true_file_name);
@@ -355,7 +353,8 @@ load (const char *file_name, void (**eip) (void), void **esp)
     }
 
   /* Set up stack. */
-  if (!setup_stack (esp, file_name))
+  strlcpy(temp_file_name, file_name, strlen(file_name)+1);
+  if (!setup_stack (esp, temp_file_name))
     goto done;
 
 
@@ -363,11 +362,12 @@ load (const char *file_name, void (**eip) (void), void **esp)
   *eip = (void (*) (void)) ehdr.e_entry;
 
   success = true;
-  
+  if (!success) {
+    file_close(t->exefile);
+  }  
  done:
   free(temp_file_name);
   /* We arrive here whether the load is successful or not. */
-  //file_close (file);
   return success;
 }
 /* load() helpers. */
@@ -491,52 +491,52 @@ setup_stack (void **esp, const char* file_name)
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success) {
-        *esp = PHYS_BASE - 12;
+        *esp = PHYS_BASE;
+        //push filename and args on the stack
+        char *token, *save_ptr2;
+        int argsSize = 0;
+        int numArgs = 0;
+        for (token = strtok_r(file_name, " ", &save_ptr2); token != NULL;
+          token = strtok_r(NULL, " ", &save_ptr2)) 
+        {
+          int tokenSize = strlen(token) + 1;
+          if (argsSize + tokenSize > 4096) {
+            break;
+          }
+          *esp -= tokenSize;
+          strlcpy((char*)*esp, token, tokenSize);
+          argsSize += tokenSize;
+          numArgs++;
+        }
+
+        // Temporary stack ptr to scan for addresses.
+        void* tempStackPtr = *esp;
+
+        // Round down stack pointer to multiple of 4.
+        *esp -= 4 - (argsSize % 4);
+
+        *esp -= 4;
+        **(char***) esp = NULL;
+        int i; 
+        for (i = 0; i < numArgs; i++) {
+          *esp -= 4;
+          **(char***) esp = tempStackPtr;
+          tempStackPtr += strlen((char*) tempStackPtr) + 1;
+        }
+
+        tempStackPtr = *esp;
+        *esp -= 4;
+        **(char***) esp = tempStackPtr;
+
+        *esp -= 4;
+        **(int**) esp = numArgs;
+
+        *esp -= 4;
+        **(char***) esp = NULL;
         }
       } else {
         palloc_free_page (kpage);
       }
-  //push filename and args on the stack
-  char *token, *save_ptr2;
-  int argsSize = 0;
-  int numArgs = 0;
-  for (token = strtok_r(file_name, " ", &save_ptr2); token != NULL;
-  	token = strtok_r(NULL, " ", &save_ptr2)) 
-  {
-    int tokenSize = strlen(token) + 1;
-    if (argsSize + tokenSize > 4096) {
-      break;
-    }
-	  *esp -= tokenSize;
-    strlcpy((char*)*esp, token, tokenSize);
-    argsSize += tokenSize;
-    numArgs++;
-  }
-
-  // Temporary stack ptr to scan for addresses.
-  void* tempStackPtr = *esp;
-
-  // Round down stack pointer to multiple of 4.
-  *esp -= 4 - (argsSize % 4);
-
-  *esp -= 4;
-  **(char***) esp = NULL;
-  int i; 
-  for (i = 0; i < numArgs; i++) {
-    *esp -= 4;
-    **(char***) esp = tempStackPtr;
-    tempStackPtr += strlen((char*) tempStackPtr) + 1;
-  }
-
-  tempStackPtr = *esp;
-  *esp -= 4;
-  **(char***) esp = tempStackPtr;
-
-  *esp -= 4;
-  **(int**) esp = numArgs;
-
-  *esp -= 4;
-  **(char***) esp = NULL;
   
   return success;
 }

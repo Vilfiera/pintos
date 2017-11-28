@@ -249,13 +249,14 @@ thread_create (const char *name, int priority,
   struct thread *parent = thread_current();
   t -> parent = parent;
   struct child_record *cr = (struct child_record*) malloc(sizeof(struct child_record));
+  if (cr == NULL)
+    return TID_ERROR;
   cr->child = t;
   cr->id = t->tid;
   cr->waiting = false;
   list_push_back(&(parent->childlist), &(cr->elem));
   #endif
 
-  /* TODO: ADD SEMA DOWN TO SIGNAL PARENT THAT ITS OK TO CONTINUE */
   /* Add to run queue. */
   thread_unblock (t);
 
@@ -535,6 +536,7 @@ init_thread (struct thread *t, const char *name, int priority)
   sema_init(&(t->child_load_sema), 0);
   list_init(&(t->childlist));
   sema_init(&(t->child_sema), 0);
+  t->child_status = 0;
   intr_set_level (old_level);
 }
 

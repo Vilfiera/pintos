@@ -50,7 +50,6 @@ syscall_handler (struct intr_frame *f)
 		parse_args(esp, &args[0], 1);
     valid_ptr(args[0]);
     valid_string((void*) args[0]);
-			/* TODO: SEMA DOWN TO WAIT FOR CHILD TO LOAD */
     f->eax = exec ((const char*) args[0]);
 		break;
 	case SYS_WAIT:
@@ -123,10 +122,6 @@ void exit (int status)
     while (e != list_end(listOfParent)) {
       struct child_record *cr = list_entry(e, struct child_record, elem);
       if (cr->id == t->tid) {
-        if (status == 1) {
-          cr->retVal = -1;
-          break;	
-        }
         cr->retVal = status;
         cr->child = NULL; 
         break;
@@ -140,11 +135,16 @@ void exit (int status)
   if ( t->parent_wait)
    sema_up(&(t->parent->child_sema));
   file_close (t->exefile);
+  struct list *templist = &(t -> childlist);
+  while (!list_empty (templist)) {
+      struct list_elem *cr_elem = list_pop_front (templist);
+      struct child_record *tempCR = list_entry(cr_elem, struct child_record, elem);
+      free(tempCR);
+  }
   thread_exit ();
 }
 pid_t exec (const char *cmd_line) 
 {
- //return +ve value if success otherwise -1
   int result = process_execute(cmd_line);
   sema_down(&(thread_current()->child_load_sema));
   if (thread_current()->child_status == -1) {
@@ -177,12 +177,17 @@ int open (const char *file)
   lock_acquire(&filesys_mutex);
   struct file_record *cfileRecord;
   cfileRecord = malloc ( sizeof (struct file_record));
-  struct thread *t = thread_current();
-  struct file *currentfile = filesys_open (file);
-  if ( currentfile == NULL) {
+  if (cfileRecord == NULL) {
     lock_release(&filesys_mutex);
     return -1;
   }
+  struct file *currentfile = filesys_open (file);
+  if ( currentfile == NULL) {
+    free(cfileRecord);
+    lock_release(&filesys_mutex);
+    return -1;
+  }
+  struct thread *t = thread_current();
   cfileRecord -> cfile = currentfile;
   cfileRecord -> fd = t -> total_fd;
   t -> total_fd = t -> total_fd + 1;
@@ -197,8 +202,9 @@ int filesize (int fd)
   struct file *tempfile;
   tempfile = file_ptr(fd);
   if (tempfile != NULL) {
+    int result = file_length(tempfile);
     lock_release(&filesys_mutex);
-  	return file_length(tempfile);
+  	return result;
   }
   lock_release(&filesys_mutex);
   return -1;
@@ -292,12 +298,11 @@ void close (int fd)
            e = list_next (e))
    {
 	  tempfileRd = list_entry(e,struct file_record, elem);
-	  if ( tempfileRd->fd == fd)
-	      {
-		file_close(tempfileRd -> cfile);
-		list_remove(e);
-		free(tempfileRd);
-		break;
+	  if (tempfileRd->fd == fd) {
+      file_close(tempfileRd -> cfile);
+      list_remove(e);
+      free(tempfileRd);
+      break;
 		}
    }
   lock_release(&filesys_mutex);
