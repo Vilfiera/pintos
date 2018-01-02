@@ -1,6 +1,6 @@
 #include "vm/frame.h"
-struct hash frame_table;
-struct lock mutex;
+static struct hash frame_table;
+static struct lock mutex;
 
 // Returns a hash value for frame p.
 unsigned frame_hash(const struct hash_elem *p_, void *aux) {
@@ -28,31 +28,22 @@ struct ft_record *frame_lookup(const void *frame_addr) {
   return e != NULL ? hash_entry(e, struct ft_record, hash_ele) : NULL;
 }
 
-// Deletes the ft_record containing the given frame,
-// or does nothing if no such frame exists.
-void frame_delete(const void *frame_addr) {
-  struct ft_record frame_record;
-  struct hash_elem *e;
-  
-  frame_record.frame_addr = frame_addr;
-  e = hash_delete(&frame_table, &frame_record.hash_ele);
-}
-
+//initialize the hash table and mutex
 void ft_init() {
   hash_init(&frame_table, frame_hash, frame_less, NULL);
   lock_init(&mutex);
 }
 
+
 void* allocFrame(enum palloc_flags flags, void *upage) {
   lock_acquire(&mutex);
-  void *frame_addr = palloc_get_page(flags);
+  void *frame_addr = palloc_get_page(PAL_USER | flags);
   if (frame_addr == NULL) {
     // Out of frames, need to evict a page.
   }
   struct ft_record *resultFrame = malloc(sizeof(struct ft_record));
   if (resultFrame == NULL) {
     lock_release(&mutex);
-    free(resultFrame);
     return NULL;
   }
   // Initialize ft entry.
@@ -66,6 +57,24 @@ void* allocFrame(enum palloc_flags flags, void *upage) {
   lock_release(&mutex);
   return frame_addr;
 }
+
+// Deletes the ft_record containing the given frame,
+// or does nothing if no such frame exists.
+void frame_delete(const void *frame_addr) {
+  struct ft_record frame_record;
+  frame_record.frame_addr = frame_addr;
+  struct hash_elem *e = hash_find(&frame_table, & (frame_record.hash_ele));
+  if (e == NULL){
+  	PANIC("Page Not found.");
+   }
+  
+  frame_record = hash_entry(e , struct frame_record, hash_ele);
+  hash_delete(&frame_table, &frame_record.hash_ele);
+  palloc_free ( frame_addr);
+}
+
+
+
 
 void freeFrame(void *frame_addr) {
   lock_acquire(&mutex);
