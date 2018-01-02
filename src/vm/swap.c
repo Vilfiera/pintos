@@ -18,7 +18,7 @@ void swap_init()
 	NOT_REACHED();
  }
  //num of pages in swap disk
- swap_size = block_size (swap_block) / SECTORS_PER_PAGE;
+ swap_size = block_size (swap_block) / SECTORS_P_PAGE;
  //create bitmap for the swap disk
  swap_present = bitmap_create(swap_size);
  bitmap_set_all(swap_present, true);
@@ -30,9 +30,9 @@ uint32_t swap_out (void *page){
  ASSERT(page >= PHYS_BASE);
  //find block that can be use for swap
  size_t swap_index = bitmap_scan (swap_present, 0, 1, true);
-
- for (size_t i = 0; i < SECTORS_P_PAGE; ++i){
-  block_write(swap_block, swap_index * SECTORS_PER_PAGE + i,
+ size_t i;
+ for (i = 0; i < SECTORS_P_PAGE; ++i){
+  block_write(swap_block, swap_index * SECTORS_P_PAGE + i,
   		page + (BLOCK_SECTOR_SIZE * i) );
  }
  //the region is not present anymore
@@ -49,10 +49,10 @@ void swap_in ( uint32_t swap_index, void *page){
  if ( bitmap_test (swap_present, swap_index) == true){
   PANIC("Invalid access in swap disk");
  }
-
- for (size_t i = 0; i < SECTORS_P_PAGE; ++i)
+ size_t i;
+ for (i = 0; i < SECTORS_P_PAGE; ++i)
  {
-  block_read (swap_block, swap_index * SECTORS_P_PAGE +i, page + (BLOCK_SECTORS_SIZE * i) );
+  block_read (swap_block, swap_index * SECTORS_P_PAGE +i, page + (BLOCK_SECTOR_SIZE * i) );
  }
  bitmap_set (swap_present, swap_index, true);
 }

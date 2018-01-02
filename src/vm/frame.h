@@ -10,6 +10,8 @@ struct ft_record {
   void *user_page; // virtual page occupying the frame
   struct thread *owner; // current thread owner of this frame
   struct hash_elem hash_ele; // hash table element
+  struct list_elem list_ele; //for clock algo
+  bool pin;
 };
 
 unsigned frame_hash(const struct hash_elem *p_, void *aux);
