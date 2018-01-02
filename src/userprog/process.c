@@ -143,6 +143,7 @@ process_exit (void)
   /* Destroy the current process's page directory and switch back
      tco the kernel-only page directory. */
   pd = cur->pagedir;
+  spt_free(cur->sup_pt);
   if (pd != NULL) 
     {
       /* Correct ordering here is crucial.  We must set
@@ -262,6 +263,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   if (t->pagedir == NULL) {
     goto done;
   }
+  t->sup_pt = spt_init();
   process_activate ();
 
   /* Open executable file. */
@@ -451,13 +453,21 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
-      /* Get a page of memory. */
+      // Lazy loading (handled in page fault handler)
+      
+      if (!spt_addFile(thread_current()->sup_pt, upage, file, ofs,
+                        read_bytes, zero_bytes, writable)) {
+        return false;
+      }
+
+
+/*      // Get a page of memory.
       uint8_t *kpage = allocFrame(PAL_USER, upage);
       //uint8_t *kpage = palloc_get_page (PAL_USER);
       if (kpage == NULL)
         return false;
 
-      /* Load this page. */
+      // Load this page.
       if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
         {
           freeFrame(kpage);
@@ -466,18 +476,19 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
         }
       memset (kpage + page_read_bytes, 0, page_zero_bytes);
 
-      /* Add the page to the process's address space. */
+      // Add the page to the process's address space.
       if (!install_page (upage, kpage, writable)) 
         {
           freeFrame(kpage);
           //palloc_free_page (kpage);
           return false; 
         }
-
+*/
       /* Advance. */
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
       upage += PGSIZE;
+      ofs += PGSIZE;
     }
   return true;
 }
@@ -565,5 +576,6 @@ install_page (void *upage, void *kpage, bool writable)
   /* Verify that there's not already a page at that virtual
      address, then map our page there. */
   return (pagedir_get_page (t->pagedir, upage) == NULL
-          && pagedir_set_page (t->pagedir, upage, kpage, writable));
+          && pagedir_set_page (t->pagedir, upage, kpage, writable)
+          && spt_addFrame(t->sup_pt, upage, kpage));
 }

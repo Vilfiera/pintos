@@ -82,6 +82,8 @@ typedef int tid_t;
    blocked state is on a semaphore wait list. */
 struct thread
   {
+    // Supplementary page table
+    struct hash *sup_pt;
     //exe file
     struct file *exefile;
     //bool parent waiting
@@ -118,9 +120,9 @@ struct thread
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
 
-   // next fd
-   int total_fd;
-   struct list fd_entries;
+     // next fd
+     int total_fd;
+     struct list fd_entries;
   };
 
 struct file_record
