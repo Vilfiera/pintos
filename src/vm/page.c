@@ -178,7 +178,7 @@ bool spt_load(struct hash* spt, uint32_t pagedir, void* user_page) {
     // Already in a frame, nothing needs to be done.
   } else if (status == STATUS_SWAP) {
     // Loads page from our swap table to our frame.
-    // TODO:
+    swap_in(sp_record->swap_index, frame_addr);
   } else if (status == STATUS_FILE) {
     // Seeks to correct place in the file.
     file_seek(sp_record->file, sp_record->offset);
@@ -213,6 +213,7 @@ bool spt_load(struct hash* spt, uint32_t pagedir, void* user_page) {
   return true;
 }
 
+// Pins the corresponding frame to the given page.
 void spt_pinPage(struct hash *spt, void *user_page) {
   struct spt_record *sp_record = page_lookup(spt, user_page);
   if (sp_record && sp_record->status == STATUS_FRAME)  {
@@ -220,9 +221,50 @@ void spt_pinPage(struct hash *spt, void *user_page) {
   }
 }
 
+// Unpins the corresponding frame to the given page.
 void spt_unpinPage(struct hash *spt, void *user_page) {
   struct spt_record *sp_record = page_lookup(spt, user_page);
   if (sp_record && sp_record->status == STATUS_FRAME)  {
     frame_unpin(sp_record->frame_addr);
   }
+}
+
+void spt_unmapFile(struct hash *spt, void *pagedir, void *user_page,
+                    struct file *f, off_t offset, size_t num_bytes) {
+  struct spt_record *sp_record = page_lookup(spt, user_page);
+  if (!sp_record) {
+    PANIC("munmap couldn't find the desired page");
+  }
+
+  if (sp_record->status == STATUS_FRAME) {
+    frame_pin(sp_record->frame_addr);
+  }
+
+  
+  if (sp_record->status == STATUS_FRAME) {
+    // If dirty, write directly from frame to the file.
+    if (sp_record->dirty || pagedir_is_dirty(pagedir, sp_record->user_page) ||
+        pagedir_is_dirty(pagedir, sp_record->frame_addr)) {
+      file_write_at(f, sp_record->user_page, num_bytes, offset);
+    }
+
+    frame_delete(sp_record->frame_addr, true);
+    pagedir_clear_page(pagedir, sp_record->user_page);
+  } else if (sp_record->status == STATUS_SWAP) {
+    // If dirty, we need to swap the page back in, then write to the file.
+    if (sp_record->dirty || pagedir_is_dirty(pagedir, sp_record->user_page)) {
+      // This frame is only for our usage, so it's not allocated with PAL_USER
+      void *temp_frame = palloc_get_page(0);
+
+      swap_in(sp_record->swap_index, temp_frame);
+      file_write_at(f, temp_frame, num_bytes, offset);
+      
+      palloc_free_page(temp_frame);
+    // If not, free the swap slot
+    } else {
+      swap_delete(sp_record->swap_index);
+    }
+  }
+  // Remove memory mapped file from our page table.
+  hash_delete(spt, sp_record->hash_ele);
 }

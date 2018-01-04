@@ -82,6 +82,8 @@ typedef int tid_t;
    blocked state is on a semaphore wait list. */
 struct thread
   {
+    // List of mmap files 
+    struct list mmapList;
     //for pagefault at kernel thread
     uint8_t current_esp;
     // Supplementary page table
@@ -143,6 +145,15 @@ struct child_record
  struct list_elem elem; 
 };
 
+struct mmap_record
+{
+  int id;
+  struct file *file;
+  void *user_addr;
+  size_t file_size;
+
+  struct list_elem elem;
+};
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */

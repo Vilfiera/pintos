@@ -7,6 +7,9 @@
 #include "threads/palloc.h"
 #include "threads/vaddr.h"
 #include "userprog/pagedir.h"
+#include "vm/frame.h"
+#include "vm/swap.h"
+
 #define STATUS_ZERO 0
 #define STATUS_FRAME 1
 #define STATUS_SWAP 2
@@ -50,5 +53,9 @@ bool spt_addFile(struct hash *spt, void *user_page, struct file *file,
                   off_t offset, size_t read_bytes, size_t zero_bytes, bool writable);
 
 bool spt_load(struct hash* spt, uint32_t pagedir, void* user_page);
+
+void spt_pinPage(struct hash *spt, void *user_page);
+void spt_unpinPage(struct hash *spt, void *user_page);
+
 #endif // vm/page.h
 
