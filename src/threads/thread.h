@@ -82,6 +82,8 @@ typedef int tid_t;
    blocked state is on a semaphore wait list. */
 struct thread
   {
+    //for pagefault at kernel thread
+    uint8_t current_esp;
     // Supplementary page table
     struct hash *sup_pt;
     //exe file
