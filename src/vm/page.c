@@ -266,5 +266,5 @@ void spt_unmapFile(struct hash *spt, void *pagedir, void *user_page,
     }
   }
   // Remove memory mapped file from our page table.
-  hash_delete(spt, sp_record->hash_ele);
+  hash_delete(spt, &sp_record->hash_ele);
 }

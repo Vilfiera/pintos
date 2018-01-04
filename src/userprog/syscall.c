@@ -7,7 +7,10 @@
 #include "devices/shutdown.h"
 #include "filesys/off_t.h"
 #include "lib/string.h"
-
+#include "threads/malloc.h";
+#include "threads/palloc.h";
+#include "threads/vaddr.h";
+#include "lib/kernel/list.h";
 /* Typical return values from main() and arguments to exit(). */
 #define EXIT_SUCCESS 0          /* Successful execution. */
 #define EXIT_FAILURE 1          /* Unsuccessful execution. */
@@ -321,6 +324,60 @@ void close (int fd)
    }
   lock_release(&filesys_mutex);
 }
+
+
+
+int mmap(int fd, void *user_page){
+	if ( user_page == NULL || pg_ofs (user_page) != 0) return -1;
+	if (fd < 1) return -1;
+	struct thread *t = thread_current();
+	lock_acquire (&filesys_mutex);
+	
+	//opening file
+	struct file *f = NULL;
+	struct file_record *file_r = file_ptr (fd);
+	if (file_r != NULL){
+		f = file_reopen (file_r -> cfile);
+	}
+	if ( f == NULL ){
+		lock_release (&filesys_mutex);
+		return -1;
+	}
+	size_t f_size = file_length (f);
+	if ( f_size == 0){
+		lock_release(&filesys_mutex);
+		return -1;
+	}
+	
+	//mapping to memory
+	size_t offset;
+	for ( offset = 0; offset < f_size; offset += PGSIZE){
+		void *addr = user_page + offset;
+		if ( page_lookup (t -> sup_pt, addr)){
+			lock_release (&filesys_mutex);
+			return -1;
+		}
+	}
+	int id;
+	if ( !list_empty (& t -> mmapList)){
+		id = list_entry ( list_back (&t -> mmapList), struct mmap_record, elem) -> id+1;
+	}
+	else id = 1;
+	struct mmap_record *mmap_r = (struct mmap_record *) malloc (sizeof (struct mmap_record));
+	mmap_r -> id = id;
+	mmap_r -> file = f;
+	mmap_r -> user_addr = user_page;
+	mmap_r -> file_size = f_size;
+	list_push_back (&t->mmapList, &mmap_r -> elem);
+	
+	lock_release (&filesys_mutex);
+	return id;
+}
+
+
+
+
+
 
 struct file * file_ptr(int fd)
 {
