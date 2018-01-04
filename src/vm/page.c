@@ -19,7 +19,7 @@ bool page_less(const struct hash_elem *a_, const struct hash_elem *b_,
 void spt_free_elem(struct hash_elem *p_, void *aux UNUSED) {
   struct spt_record *sp_record = hash_entry(p_, struct spt_record, hash_ele);
   if (sp_record->status == STATUS_FRAME && sp_record->frame_addr) {
-    freeFrame(sp_record->frame_addr);
+    freeFrame(sp_record->frame_addr, false);
   } else if (sp_record->status == STATUS_SWAP) {
     //free from swap table
   }
@@ -187,7 +187,7 @@ bool spt_load(struct hash* spt, uint32_t pagedir, void* user_page) {
     int bytesRead = file_read(sp_record->file, frame_addr, sp_record->read_bytes);
     if (bytesRead != (int) sp_record->read_bytes) {
       // Something went wrong, didn't read correct number of bytes.
-      freeFrame(frame_addr);
+      freeFrame(frame_addr, true);
       return false; 
     }
     // Zeroes out the rest of the page.
@@ -199,7 +199,7 @@ bool spt_load(struct hash* spt, uint32_t pagedir, void* user_page) {
 
   // Maps page to frame in pagedir.
   if (!pagedir_set_page(pagedir, user_page, frame_addr, writable)) {
-    freeFrame(frame_addr);
+    freeFrame(frame_addr, true);
     return false;
   }
   // Frame cannot be dirty; we just installed the page.

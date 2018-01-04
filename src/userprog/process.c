@@ -552,7 +552,7 @@ setup_stack (void **esp, const char* file_name)
         **(char***) esp = NULL;
         }
       } else {
-        freeFrame(kpage);
+        freeFrame(kpage, true);
         //palloc_free_page (kpage);
       }
   

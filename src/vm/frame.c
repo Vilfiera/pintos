@@ -70,7 +70,7 @@ void* allocFrame(enum palloc_flags flags, void *upage) {
     uint32_t swap_id = swap_out (ft_evict->frame_addr);
     spt_addSwap (ft_evict -> owner -> sup_pt, ft_evict -> user_page, swap_id);
     spt_setDirty (ft_evict -> owner -> sup_pt, ft_evict -> user_page, is_dirty);
-    freeFrame (ft_evict -> frame_addr);
+    freeFrame (ft_evict -> frame_addr, true);
     frame_addr = palloc_get_page (PAL_USER | flags);
     ASSERT (frame_addr != NULL);
     
@@ -94,7 +94,7 @@ void* allocFrame(enum palloc_flags flags, void *upage) {
 
 // Deletes the ft_record containing the given frame,
 // or does nothing if no such frame exists.
-void frame_delete(const void *frame_addr) {
+void frame_delete(const void *frame_addr, bool deFrame) {
   ASSERT (lock_held_by_current_thread ( &mutex) == true);
   ASSERT (is_kernel_vaddr (frame_addr));
   ASSERT (pg_ofs (frame_addr) == 0);
@@ -107,7 +107,9 @@ void frame_delete(const void *frame_addr) {
   
   struct ft_record *nf_record = hash_entry(e , struct ft_record, hash_ele);
   hash_delete(&frame_table, &nf_record->hash_ele);
-  palloc_free_page( frame_addr);
+  if (deFrame) {
+    palloc_free_page( frame_addr);
+  }
 }
 
 struct ft_record* select_frame_evict (uint32_t *pagedir){
@@ -161,9 +163,9 @@ void frame_unpin (void *frame_addr){
 void frame_pin (void *frame_addr){
  set_pin (frame_addr, true);
 }
-void freeFrame(void *frame_addr) {
+void freeFrame(void *frame_addr, bool deFrame) {
   lock_acquire(&mutex);
-  frame_delete(frame_addr);
+  frame_delete(frame_addr, deFrame);
   lock_release(&mutex);
 }
 

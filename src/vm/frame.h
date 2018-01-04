@@ -18,9 +18,9 @@ unsigned frame_hash(const struct hash_elem *p_, void *aux);
 bool frame_less(const struct hash_elem *a_, const struct hash_elem *b_,
                 void *aux);
 struct ft_record *frame_lookup(const void *frame_addr);
-void frame_delete(const void *frame_addr);
+void frame_delete(const void *frame_addr, bool deFrame);
 void ft_init(void);
 void* allocFrame(enum palloc_flags flags, void *upage);
-void freeFrame(void *frame_addr);
+void freeFrame(void *frame_addr, bool deFrame);
 
 #endif // vm/frame.h
