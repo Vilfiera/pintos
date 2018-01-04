@@ -109,7 +109,7 @@ syscall_handler (struct intr_frame *f)
 		parse_args(esp, &args[0], 1);
     close ((int) args[0]);
 		break;
-	case SYS_MMAP:
+  /*case SYS_MMAP:
 		parse_args(esp, &args[0], 2);
 		valid_ptr(args[1]);
 		valid_buf((char*) args[1], 0);
@@ -118,7 +118,7 @@ syscall_handler (struct intr_frame *f)
 	case SYS_MUNMAP:
 		parse_args(esp, &args[0], 1);
 		munmap((int) args[0]);
-		break;
+		break;*/
 	default:	
 		exit(-1);	
   }
@@ -340,7 +340,7 @@ void close (int fd)
 
 
 
-int mmap(int fd, void *user_page){
+/*int mmap(int fd, void *user_page){
 	if ( user_page == NULL || pg_ofs (user_page) != 0) return -1;
 	if (fd < 1) return -1;
 	struct thread *t = thread_current();
@@ -413,7 +413,7 @@ static struct mmap_record* find_mmap_record (int id){
 		}
 	}
 	return NULL;
-}
+}*/
 
 
 
