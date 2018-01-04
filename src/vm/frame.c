@@ -61,7 +61,7 @@ void* allocFrame(enum palloc_flags flags, void *upage) {
     //swap out the page
     struct ft_record *ft_evict = select_frame_evict ( thread_current () -> pagedir);
 
-    ASSERT (ft_evict -> owner -> pagedir != (void*) 0xcccccccc);
+    //ASSERT (ft_evict -> owner -> pagedir != (void*) 0xcccccccc);
     pagedir_clear_page (ft_evict -> owner -> pagedir, ft_evict->user_page);
     bool is_dirty = false;
     is_dirty = is_dirty || pagedir_is_dirty(ft_evict -> owner -> pagedir, ft_evict -> user_page);
@@ -84,6 +84,7 @@ void* allocFrame(enum palloc_flags flags, void *upage) {
   resultFrame->frame_addr = frame_addr;
   resultFrame->user_page = upage;
   resultFrame->owner = thread_current();
+  resultFrame->pin = true;
 
   // Insert ft entry into frame table.
   hash_insert(&frame_table, &resultFrame->hash_ele);
@@ -110,6 +111,7 @@ void frame_delete(const void *frame_addr, bool deFrame) {
   if (deFrame) {
     palloc_free_page( frame_addr);
   }
+  free(nf_record);
 }
 
 struct ft_record* select_frame_evict (uint32_t *pagedir){

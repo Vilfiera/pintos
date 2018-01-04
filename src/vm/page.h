@@ -17,6 +17,7 @@ struct spt_record {
  
   uint8_t status;
   bool dirty;
+  bool pinned;
   
   // Swap stuff
   size_t swap_index;

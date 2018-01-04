@@ -575,7 +575,11 @@ install_page (void *upage, void *kpage, bool writable)
 
   /* Verify that there's not already a page at that virtual
      address, then map our page there. */
-  return (pagedir_get_page (t->pagedir, upage) == NULL
+  bool result = (pagedir_get_page (t->pagedir, upage) == NULL
           && pagedir_set_page (t->pagedir, upage, kpage, writable)
           && spt_addFrame(t->sup_pt, upage, kpage));
+  if (result) {
+    spt_pinPage(t->sup_pt, upage);
+  }
+  return result;
 }

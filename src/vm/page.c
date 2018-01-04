@@ -208,6 +208,21 @@ bool spt_load(struct hash* spt, uint32_t pagedir, void* user_page) {
   // Updates information on our supplementary page table.
   sp_record->frame_addr = frame_addr;
   sp_record->status = STATUS_FRAME;
+
+  frame_unpin(frame_addr);
   return true;
 }
 
+void spt_pinPage(struct hash *spt, void *user_page) {
+  struct spt_record *sp_record = page_lookup(spt, user_page);
+  if (sp_record && sp_record->status == STATUS_FRAME)  {
+    frame_pin(sp_record->frame_addr);
+  }
+}
+
+void spt_unpinPage(struct hash *spt, void *user_page) {
+  struct spt_record *sp_record = page_lookup(spt, user_page);
+  if (sp_record && sp_record->status == STATUS_FRAME)  {
+    frame_unpin(sp_record->frame_addr);
+  }
+}
