@@ -2,11 +2,18 @@
 #include <inttypes.h>
 #include <stdio.h>
 #include "userprog/gdt.h"
+#include "userprog/syscall.h"
+#include "userprog/pagedir.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#ifdef VM
 #include "vm/page.h"
+#include "vm/frame.h"
+#endif
 
+
+#define MAX_STACK_SIZE 0x800000
 /* Number of page faults processed. */
 static long long page_fault_cnt;
 
@@ -155,16 +162,72 @@ page_fault (struct intr_frame *f)
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to
      which fault_addr refers. */
+	 
+	 
+
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+#if VM
   void *fault_page = pg_round_down(fault_addr);
   struct thread *t = thread_current();
-  if (!spt_load(t->sup_pt, t->pagedir, fault_page)) {
-    printf ("Page fault at %p: %s error %s page in %s context.\n",
+  if (!not_present) {
+	  	if(!user){
+		f->eip = (void *) f->eax;
+		f->eax = 0xffffffff;
+		return;
+	}
+	kill (f);
+  }
+  
+  void *esp = user ? f->esp : t -> current_esp;
+  
+  //stack growth
+  bool stack_frame, is_stack_addr;
+  stack_frame = (esp <= fault_addr || fault_addr == f -> esp - 4 || fault_addr == f-> esp - 32);
+  is_stack_addr = (PHYS_BASE - MAX_STACK_SIZE  <= fault_addr && fault_addr < PHYS_BASE);
+  
+  if ( stack_frame && is_stack_addr){
+	  //grow stack
+	  if (page_lookup ( t -> sup_pt, fault_page) == false){
+		  spt_addZeroPage (t -> sup_pt, fault_page);
+	  }	  
+  }
+  if(! spt_load (t -> sup_pt, t -> pagedir, fault_page) ){
+	  	if(!user){
+		f->eip = (void *) f->eax;
+		f->eax = 0xffffffff;
+		return;
+	}
+	kill (f);
+  }
+  //success
+  return;
+
+
+PAGE_ACCESS_VIOLATION:	
+#endif
+	if(!user){
+		f->eip = (void *) f->eax;
+		f->eax = 0xffffffff;
+		return;
+	}
+	printf ("Page fault at %p: %s error %s page in %s context.\n",
             fault_addr,
             not_present ? "not present" : "rights violation",
             write ? "writing" : "reading",
             user ? "user" : "kernel");
     kill (f);
-  }
+  
 }
+
+
+
 
 
