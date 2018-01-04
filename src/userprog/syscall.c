@@ -233,7 +233,10 @@ int read (int fd, void *buffer, unsigned length)
       lock_release(&filesys_mutex);
  	    return -1;
    }
+   
+    load_pin_pages (buffer, length);
     int result = file_read (tempfile, buffer, length);
+	unpin_pages (buffer, length);
     lock_release(&filesys_mutex);
     return result;
  }
@@ -262,7 +265,9 @@ if (fd != 1)
     lock_release(&filesys_mutex);
     return -1;
   }
+  load_pin_pages (buffer, length);
  	int result = file_write (tempfile, buffer, length);
+	unpin_pages (buffer, length);
   lock_release(&filesys_mutex);
   return result;
  }
@@ -338,6 +343,30 @@ struct file * file_ptr(int fd)
   return NULL;
 
 }
+
+
+void load_pin_pages ( const void *buffer, size_t length){
+	struct thread *t = thread_current();
+	struct hash *spt_pt = t -> sup_pt;
+	uint32_t *pagedir = t  -> pagedir;
+	
+	void *user_page;
+	for ( user_page = pg_round_down (buffer); user_page < buffer + length; user_page += PGSIZE){
+		spt_load (spt_pt , pagedir, user_page);
+		spt_pinPage (spt_pt, user_page);
+	}
+}
+
+
+void unpin_pages ( const void *buffer, size_t length){
+	struct thread *t = thread_current();
+struct hash *spt_pt = t -> sup_pt;
+	void *user_page;
+	for ( user_page = pg_round_down(buffer); user_page < buffer + length; user_page += PGSIZE){
+		spt_unpinPage (spt_pt, user_page);
+	}
+}
+
 
 static void parse_args(void* esp, int* argBuf, int numToParse) {
   int i;
