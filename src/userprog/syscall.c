@@ -11,6 +11,7 @@
 #include "threads/palloc.h";
 #include "threads/vaddr.h";
 #include "lib/kernel/list.h";
+#include "threads/thread.h";
 /* Typical return values from main() and arguments to exit(). */
 #define EXIT_SUCCESS 0          /* Successful execution. */
 #define EXIT_FAILURE 1          /* Unsuccessful execution. */
@@ -24,6 +25,8 @@ static void parse_args(void* esp, int* argBuf, int numToParse);
 static void valid_ptr(void* user_ptr);
 static void valid_buf(char* buf, unsigned size);
 static void valid_string(void* string);
+static struct mmap_record* find_mmap_record (int id);
+bool munmap (int id);
 
 void
 syscall_init (void) 
@@ -106,8 +109,18 @@ syscall_handler (struct intr_frame *f)
 		parse_args(esp, &args[0], 1);
     close ((int) args[0]);
 		break;
+	case SYS_MMAP:
+		parse_args(esp, &args[0], 2);
+		valid_ptr(args[1]);
+		valid_buf((char*) args[1], 0);
+		f -> eax = mmap((int) args[0], (void*) args[1]);
+		break;
+	case SYS_MUNMAP:
+		parse_args(esp, &args[0], 1);
+		munmap((int) args[0]);
+		break;
 	default:	
-    exit(-1);	
+		exit(-1);	
   }
   thread_yield();
 }
@@ -352,6 +365,7 @@ int mmap(int fd, void *user_page){
 	//mapping to memory
 	size_t offset;
 	for ( offset = 0; offset < f_size; offset += PGSIZE){
+		valid_buf((char*) user_page, offset);
 		void *addr = user_page + offset;
 		if ( page_lookup (t -> sup_pt, addr)){
 			lock_release (&filesys_mutex);
@@ -375,6 +389,31 @@ int mmap(int fd, void *user_page){
 }
 
 
+bool munmap (int id){
+	struct thread *t = thread_current();
+	struct mmap_record *mmap_r = find_mmap_record(id);
+	if (mmap_r == NULL){
+		return false;
+	}
+	
+	lock_acquire(&filesys_mutex);
+	
+}
+
+static struct mmap_record* find_mmap_record (int id){
+	struct thread *t = thread_current();
+	ASSERT ( t != NULL );
+	struct list_elem *e;
+	if (list_empty (&t->mmapList)){
+		for (e = list_begin(&t->mmapList); e != list_end (&t->mmapList); e = list_next(e)){
+			struct mmap_record *mmap_r = list_entry (e , struct mmap_record, elem);
+			if (mmap_r -> id == id){
+				return mmap_r;
+			}
+		}
+	}
+	return NULL;
+}
 
 
 
