@@ -83,8 +83,7 @@ start_process (void *file_name_)
   /* If load failed, quit. */
   palloc_free_page (file_name);
   if (!success) 
-    thread_exit ();
-
+    exit(-1);
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
      threads/intr-stubs.S).  Because intr_exit takes all of its
@@ -147,7 +146,9 @@ process_exit (void)
     struct list_elem *mmap_elem = list_pop_front(templist);
     struct mmap_record *tempMR = list_entry(mmap_elem, struct mmap_record, elem);
     
-    // TODO: munmap(tempMR->id);
+    // TODO: 
+munmap(tempMR->id);
+
   }
 
   // Free supplementary page table.
