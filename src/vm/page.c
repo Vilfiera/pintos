@@ -41,7 +41,9 @@ bool spt_setDirty(struct hash *spt, void *user_page, bool dirtyBit) {
   if (!sp_record) {
     return false;
   }
-  sp_record->dirty = dirtyBit;
+  if (dirtyBit) {
+    sp_record->dirty = dirtyBit;
+  }
   return true;
 
 }
@@ -160,7 +162,13 @@ bool spt_load(struct hash* spt, uint32_t pagedir, void* user_page) {
   if (!sp_record) {
     return false;
   }
-  
+
+  // Check if it's on a frame; if true, don't need
+  // to do anything.
+  if (sp_record->status == STATUS_FRAME) {
+    return true;
+  }
+
   // Gets a frame to store the page.
   void *frame_addr = allocFrame(PAL_USER, user_page);
   // Unable to get a frame
@@ -175,7 +183,9 @@ bool spt_load(struct hash* spt, uint32_t pagedir, void* user_page) {
     // All zero page, zeroes out our frame.
     memset(frame_addr, 0, PGSIZE);
   } else if (status == STATUS_FRAME) {
-    // Already in a frame, nothing needs to be done.
+    // Already in a frame, free resources and exit.
+    freeFrame(frame_addr, true);
+    return false;
   } else if (status == STATUS_SWAP) {
     // Loads page from our swap table to our frame.
     swap_in(sp_record->swap_index, frame_addr);
@@ -266,5 +276,5 @@ void spt_unmapFile(struct hash *spt, void *pagedir, void *user_page,
     }
   }
   // Remove memory mapped file from our page table.
-  hash_delete(spt, sp_record->hash_ele);
+  hash_delete(spt, &sp_record->hash_ele);
 }
