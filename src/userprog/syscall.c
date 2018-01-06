@@ -129,16 +129,16 @@ syscall_handler (struct intr_frame *f)
 		parse_args(esp, &args[0], 1);
     close ((int) args[0]);
 		break;
-  /*case SYS_MMAP:
+  case SYS_MMAP:
 		parse_args(esp, &args[0], 2);
 		valid_ptr(args[1], esp);
 		valid_buf((char*) args[1], 0, esp);
-		f -> eax = mmap((int) args[0], (void*) args[1]);
+		f -> eax = mmap((int) args[0], (void*) args[1], esp);
 		break;
 	case SYS_MUNMAP:
 		parse_args(esp, &args[0], 1);
 		munmap((int) args[0]);
-		break;*/
+		break;
 	default:	
 		exit(-1);	
   }
@@ -360,7 +360,7 @@ void close (int fd)
 
 
 
-/*int mmap(int fd, void *user_page){
+int mmap(int fd, void *user_page, void* esp){
 	if ( user_page == NULL || pg_ofs (user_page) != 0) return -1;
 	if (fd < 1) return -1;
 	struct thread *t = thread_current();
@@ -385,7 +385,7 @@ void close (int fd)
 	//mapping to memory
 	size_t offset;
 	for ( offset = 0; offset < f_size; offset += PGSIZE){
-		valid_buf((char*) user_page, offset);
+		valid_buf((char*) user_page, offset, esp);
 		void *addr = user_page + offset;
 		if ( page_lookup (t -> sup_pt, addr)){
 			lock_release (&filesys_mutex);
@@ -433,7 +433,7 @@ static struct mmap_record* find_mmap_record (int id){
 		}
 	}
 	return NULL;
-}*/
+}
 
 
 
