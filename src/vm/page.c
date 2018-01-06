@@ -21,7 +21,7 @@ void spt_free_elem(struct hash_elem *p_, void *aux UNUSED) {
   if (sp_record->status == STATUS_FRAME && sp_record->frame_addr) {
     freeFrame(sp_record->frame_addr, false);
   } else if (sp_record->status == STATUS_SWAP) {
-    //free from swap table
+    swap_delete(sp_record->swap_index);
   }
   free(sp_record);
 }
@@ -50,6 +50,9 @@ bool spt_setDirty(struct hash *spt, void *user_page, bool dirtyBit) {
 
 struct hash* spt_init() {
   struct hash *sup_page_table = (struct hash*) malloc(sizeof(struct hash));
+  if (!sup_page_table) {
+    return NULL;
+  }
   hash_init(sup_page_table, page_hash, page_less, NULL);
   return sup_page_table;
 }
@@ -68,7 +71,8 @@ bool spt_addFrame(struct hash *spt, void *user_page, void *frame_addr) {
   sp_record->status = STATUS_FRAME;
   sp_record->dirty = false;  
   sp_record->frame_addr = frame_addr;
-  
+   
+ 
   // Tracks whether we already have an entry for this page.
   struct hash_elem *result;  
   result = hash_insert(spt, &sp_record->hash_ele);
@@ -183,9 +187,7 @@ bool spt_load(struct hash* spt, uint32_t pagedir, void* user_page) {
     // All zero page, zeroes out our frame.
     memset(frame_addr, 0, PGSIZE);
   } else if (status == STATUS_FRAME) {
-    // Already in a frame, free resources and exit.
-    freeFrame(frame_addr, true);
-    return false;
+    // Already in a frame
   } else if (status == STATUS_SWAP) {
     // Loads page from our swap table to our frame.
     swap_in(sp_record->swap_index, frame_addr);
@@ -213,7 +215,7 @@ bool spt_load(struct hash* spt, uint32_t pagedir, void* user_page) {
     return false;
   }
   // Frame cannot be dirty; we just installed the page.
-  pagedir_set_dirty(pagedir, user_page, false);
+  pagedir_set_dirty(pagedir, frame_addr, false);
 
   // Updates information on our supplementary page table.
   sp_record->frame_addr = frame_addr;

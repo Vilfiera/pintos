@@ -6,6 +6,8 @@
 #include "filesys/filesys.h"
 #include "filesys/file.h"
 #include "devices/input.h"
+#include "userprog/pagedir.h"
+#define USER_VADDR_BOUND (void*) 0x08048000
 
 void syscall_init (void);
 

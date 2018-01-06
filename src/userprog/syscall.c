@@ -15,17 +15,37 @@
 /* Typical return values from main() and arguments to exit(). */
 #define EXIT_SUCCESS 0          /* Successful execution. */
 #define EXIT_FAILURE 1          /* Unsuccessful execution. */
-#define USER_VADDR_BOUND (void*) 0x08048000
 
 struct lock filesys_mutex;
 
 static void syscall_handler (struct intr_frame *);
 
 static void parse_args(void* esp, int* argBuf, int numToParse);
-static void valid_ptr(void* user_ptr);
-static void valid_buf(char* buf, unsigned size);
-static void valid_string(void* string);
+static void valid_ptr(void* user_ptr, void* esp);
+static void valid_buf(char* buf, unsigned size, void *esp);
+static void valid_string(void* string, void* esp);
 static struct mmap_record* find_mmap_record (int id);
+static int
+get_user (const uint8_t *uaddr)
+{
+  int result;
+  asm ("movl $1f, %0; movzbl %1, %0; 1:"
+       : "=&a" (result) : "m" (*uaddr));
+  return result;
+}
+ 
+/* Writes BYTE to user address UDST.
+   UDST must be below PHYS_BASE.
+   Returns true if successful, false if a segfault occurred. */
+static bool
+put_user (uint8_t *udst, uint8_t byte)
+{
+  int error_code;
+  asm ("movl $1f, %0; movb %b2, %1; 1:"
+       : "=&a" (error_code), "=m" (*udst) : "q" (byte));
+  return error_code != -1;
+}
+
 bool munmap (int id);
 
 void
@@ -40,7 +60,7 @@ syscall_handler (struct intr_frame *f)
 {
   int args[3];
   void* esp = f->esp;
-  valid_ptr(esp);
+  valid_ptr(esp, esp);
   uint32_t current_syscall = *(uint32_t*)esp;
   
   switch(current_syscall)
@@ -54,8 +74,8 @@ syscall_handler (struct intr_frame *f)
 		break;
 	case SYS_EXEC:
 		parse_args(esp, &args[0], 1);
-    valid_ptr(args[0]);
-    valid_string((void*) args[0]);
+    valid_ptr(args[0], esp);
+    valid_string((void*) args[0], esp);
     f->eax = exec ((const char*) args[0]);
 		break;
 	case SYS_WAIT:
@@ -64,21 +84,21 @@ syscall_handler (struct intr_frame *f)
 		break;
   case SYS_CREATE:
 		parse_args(esp, &args[0], 2);
-    valid_ptr(args[0]);
-    valid_buf((char*)args[0], (unsigned)args[1]);
-    valid_string((void*) args[0]);
+    valid_ptr(args[0], esp);
+    valid_buf((char*)args[0], (unsigned)args[1], esp);
+    valid_string((void*) args[0], esp);
     f->eax = create((const char*) args[0], (unsigned) args[1]);
     break;
 	case SYS_REMOVE:
 		parse_args(esp, &args[0], 1);
-    valid_ptr(args[0]);
-    valid_string((void*) args[0]);
+    valid_ptr(args[0], esp);
+    valid_string((void*) args[0], esp);
     f->eax = remove ((const char*) args[0]);
 		break;
 	case SYS_OPEN:
 		parse_args(esp, &args[0], 1);
-    valid_ptr(args[0]);
-    valid_string((void*) args[0]);
+    valid_ptr(args[0], esp);
+    valid_string((void*) args[0], esp);
     f->eax = open ((const char*) args[0]);
 		break;
 	case SYS_FILESIZE:
@@ -87,14 +107,14 @@ syscall_handler (struct intr_frame *f)
 		break;
 	case SYS_READ:
 		parse_args(esp, &args[0], 3);
-    valid_ptr(args[1]);
-    valid_buf((char*) args[1], (unsigned)args[2]);
+    valid_ptr(args[1], esp);
+    valid_buf((char*) args[1], (unsigned)args[2], esp);
     f->eax = read ((int) args[0], (void*) args[1], (unsigned) args[2]);
 		break;
 	case SYS_WRITE:
 		parse_args(esp, &args[0], 3);
-    valid_ptr(args[1]);
-    valid_buf((char*) args[1], (unsigned) args[2]);
+    valid_ptr(args[1], esp);
+    valid_buf((char*) args[1], (unsigned) args[2], esp);
 	  f->eax = write((int) args[0], (const void*) args[1], (unsigned) args[2]);
 		break;
 	case SYS_SEEK:
@@ -111,8 +131,8 @@ syscall_handler (struct intr_frame *f)
 		break;
   /*case SYS_MMAP:
 		parse_args(esp, &args[0], 2);
-		valid_ptr(args[1]);
-		valid_buf((char*) args[1], 0);
+		valid_ptr(args[1], esp);
+		valid_buf((char*) args[1], 0, esp);
 		f -> eax = mmap((int) args[0], (void*) args[1]);
 		break;
 	case SYS_MUNMAP:
@@ -467,30 +487,40 @@ struct hash *spt_pt = t -> sup_pt;
 static void parse_args(void* esp, int* argBuf, int numToParse) {
   int i;
   for (i = 0; i < numToParse; i++) {
-    valid_ptr(esp + ((i + 1) * 4));
+    valid_ptr(esp + ((i + 1) * 4), esp);
     argBuf[i] = *(int*) (esp + ((i + 1) * 4));
   }
 } 
 
-static void valid_ptr(void* user_ptr) {
-  if (!(is_user_vaddr(user_ptr) && user_ptr > USER_VADDR_BOUND
-        && (pagedir_get_page(thread_current()->pagedir, user_ptr) != NULL))) {
+static void valid_ptr(void* user_ptr, void* esp) {
+  if (!is_user_vaddr(user_ptr) || user_ptr < USER_VADDR_BOUND) {
+    exit(-1);
+  }
+
+  struct thread *t = thread_current();
+  bool result = false;
+  void *user_pg = pg_round_down(user_ptr);
+  result = spt_load(t->sup_pt, t->pagedir, user_pg);
+  if (!result && user_ptr >= esp - 32) {
+    result = spt_addZeroPage(t->sup_pt, user_pg);
+  }
+
+  if (!result) {
     exit(-1);
   }
 }
 
-static void valid_buf(char* buf, unsigned size) {
+static void valid_buf(char* buf, unsigned size, void* esp) {
   int i;
   for (i = 0; i < size; i++) {
-    valid_ptr(&buf[i]);
+    valid_ptr(&buf[i], esp);
   }
 }
 
-static void valid_string(void* string) {
-  valid_ptr(string);
+static void valid_string(void* string, void* esp) {
+  valid_ptr(string, esp);
   while (*(uint8_t*)string != '\0') {
     string++;
-    valid_ptr(string);
+    valid_ptr(string, esp);
   }
 }
-

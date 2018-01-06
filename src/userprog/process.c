@@ -140,10 +140,23 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
+
+  // Free mmap file list
+  struct list *templist = &(cur->mmapList);
+  while (!list_empty(templist)) {
+    struct list_elem *mmap_elem = list_pop_front(templist);
+    struct mmap_record *tempMR = list_entry(mmap_elem, struct mmap_record, elem);
+    
+    // TODO: munmap(tempMR->id);
+  }
+
+  // Free supplementary page table.
+  spt_free(cur->sup_pt);
+
+
   /* Destroy the current process's page directory and switch back
      tco the kernel-only page directory. */
   pd = cur->pagedir;
-  spt_free(cur->sup_pt);
   if (pd != NULL) 
     {
       /* Correct ordering here is crucial.  We must set
@@ -579,7 +592,7 @@ install_page (void *upage, void *kpage, bool writable)
           && pagedir_set_page (t->pagedir, upage, kpage, writable)
           && spt_addFrame(t->sup_pt, upage, kpage));
   if (result) {
-    spt_pinPage(t->sup_pt, upage);
+    spt_unpinPage(t->sup_pt, upage);
   }
   return result;
 }

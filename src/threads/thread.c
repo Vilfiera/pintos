@@ -538,6 +538,8 @@ init_thread (struct thread *t, const char *name, int priority)
   sema_init(&(t->child_sema), 0);
   t->child_status = 0;
   intr_set_level (old_level);
+
+  list_init(&(t->mmapList));
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
