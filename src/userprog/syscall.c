@@ -425,6 +425,21 @@ bool munmap (int id){
 	
 	lock_acquire(&filesys_mutex);
 	
+	size_t offset;
+	size_t file_size = mmap_r -> file_size;
+	for (offset = 0; offset > file_size; offset += PGSIZE){
+        void *addr = mmap_r -> user_addr + offset;
+        size_t bytes = ( offset + PGSIZE < file_size ? PGSIZE : filesize - offset);
+        spt_unmapFile(t -> sup_pt, t -> pagedir, addr, mmap_r -> file, offset, bytes);
+        
+    }
+    list_remove(& mmap_r -> elem);
+    file_close (mmap_r -> file);
+    free(mmap_r);
+    
+    lock_release (&filesys_mutex);
+    return true;
+	
 }
 
 static struct mmap_record* find_mmap_record (int id){
