@@ -129,7 +129,7 @@ syscall_handler (struct intr_frame *f)
 		parse_args(esp, &args[0], 1);
     close ((int) args[0]);
 		break;
-  /*case SYS_MMAP:
+   case SYS_MMAP:
 		parse_args(esp, &args[0], 2);
 		valid_ptr(args[1], esp);
 		valid_buf((char*) args[1], 0, esp);
@@ -138,7 +138,7 @@ syscall_handler (struct intr_frame *f)
 	case SYS_MUNMAP:
 		parse_args(esp, &args[0], 1);
 		munmap((int) args[0]);
-		break;*/
+		break;
 	default:	
 		exit(-1);	
   }
@@ -360,7 +360,7 @@ void close (int fd)
 
 
 
-/*int mmap(int fd, void *user_page){
+int mmap(int fd, void *user_page){
 	if ( user_page == NULL || pg_ofs (user_page) != 0) return -1;
 	if (fd < 1) return -1;
 	struct thread *t = thread_current();
@@ -392,6 +392,13 @@ void close (int fd)
 			return -1;
 		}
 	}
+	//map each page to file system
+	for (offset = 0; offset < f_size; offset += PGSIZE){
+     void *new_addr = upage + offset;
+     size_t read_bytes = (offset + PGSIZE < f_size ? PGSIZE : f_size - offset);
+     size_t zero_bytes = PGSIZE - read_bytes;
+     spt_addFile(t -> sup_pt, new_addr, f, offset, read_bytes, zero_bytes, true);
+    }
 	int id;
 	if ( !list_empty (& t -> mmapList)){
 		id = list_entry ( list_back (&t -> mmapList), struct mmap_record, elem) -> id+1;
@@ -433,8 +440,7 @@ static struct mmap_record* find_mmap_record (int id){
 		}
 	}
 	return NULL;
-}*/
-
+}
 
 
 
