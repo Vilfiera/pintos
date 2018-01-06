@@ -392,6 +392,13 @@ int mmap(int fd, void *user_page, void* esp){
 			return -1;
 		}
 	}
+	//map each page to file system
+	for (offset = 0; offset < f_size; offset += PGSIZE){
+     void *new_addr = upage + offset;
+     size_t read_bytes = (offset + PGSIZE < f_size ? PGSIZE : f_size - offset);
+     size_t zero_bytes = PGSIZE - read_bytes;
+     spt_addFile(t -> sup_pt, new_addr, f, offset, read_bytes, zero_bytes, true);
+    }
 	int id;
 	if ( !list_empty (& t -> mmapList)){
 		id = list_entry ( list_back (&t -> mmapList), struct mmap_record, elem) -> id+1;
@@ -434,7 +441,6 @@ static struct mmap_record* find_mmap_record (int id){
 	}
 	return NULL;
 }
-
 
 
 
