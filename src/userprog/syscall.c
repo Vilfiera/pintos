@@ -523,7 +523,13 @@ static void valid_ptr(void* user_ptr, void* esp) {
   void *user_pg = pg_round_down(user_ptr);
   result = spt_load(t->sup_pt, t->pagedir, user_pg);
   if (!result && user_ptr >= esp - 32) {
-    result = spt_addZeroPage(t->sup_pt, user_pg);
+    bool canGrowStack;
+    canGrowStack = (esp <= user_ptr || user_ptr == esp - 4 
+                    || user_ptr == esp - 32) &&
+                    (PHYS_BASE - MAX_STACK_SIZE <= user_ptr && user_ptr < PHYS_BASE);;
+    if (canGrowStack) {
+      result = spt_addZeroPage(t->sup_pt, user_pg);
+    }
   }
 
   if (!result) {
