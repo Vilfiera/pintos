@@ -86,7 +86,7 @@ syscall_handler (struct intr_frame *f)
   case SYS_CREATE:
 		parse_args(esp, &args[0], 2);
     valid_ptr(args[0], esp);
-    valid_buf((char*)args[0], (unsigned)args[1], esp);
+//    valid_buf((char*)args[0], (unsigned)args[1], esp);
     valid_string((void*) args[0], esp);
     f->eax = create((const char*) args[0], (unsigned) args[1]);
     break;
@@ -540,12 +540,12 @@ static void valid_ptr(void* user_ptr, void* esp) {
 
 static void valid_buf(char* buf, unsigned size, void* esp) {
   int i;
-/*  for (i = 0; i < size; i++) {
+  for (i = 0; i < size; i++) {
     valid_ptr(&buf[i], esp);
   }
-*/
-  valid_ptr(buf, esp);
-  valid_ptr(buf+size-1, esp);
+
+//  valid_ptr(buf, esp);
+//  valid_ptr(buf+size-1, esp);
 }
 
 static void valid_string(void* string, void* esp) {
