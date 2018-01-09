@@ -56,14 +56,13 @@ void ft_init() {
 
 
 void* allocFrame(enum palloc_flags flags, void *upage) {
+ASSERT(pg_ofs(upage)==0);
   lock_acquire(&mutex);
   void *frame_addr = palloc_get_page(PAL_USER | flags);
   if (frame_addr == NULL) {
     // Out of frames, need to evict a page.
     //swap out the page
     struct ft_record *ft_evict = select_frame_evict ( thread_current () -> pagedir);
-
-    //ASSERT (ft_evict -> owner -> pagedir != (void*) 0xcccccccc);
     pagedir_clear_page (ft_evict -> owner -> pagedir, ft_evict->user_page);
     bool is_dirty = false;
     is_dirty = is_dirty || pagedir_is_dirty(ft_evict -> owner -> pagedir, ft_evict -> user_page);
@@ -72,7 +71,7 @@ void* allocFrame(enum palloc_flags flags, void *upage) {
     uint32_t swap_id = swap_out (ft_evict->frame_addr);
     spt_addSwap (ft_evict -> owner -> sup_pt, ft_evict -> user_page, swap_id);
     spt_setDirty (ft_evict -> owner -> sup_pt, ft_evict -> user_page, is_dirty);
-    freeFrame (ft_evict -> frame_addr, true);
+    frame_delete(ft_evict -> frame_addr, true);
     frame_addr = palloc_get_page (PAL_USER | flags);
     ASSERT (frame_addr != NULL);
     
@@ -84,12 +83,14 @@ void* allocFrame(enum palloc_flags flags, void *upage) {
   }
   // Initialize ft entry.
   resultFrame->frame_addr = frame_addr;
+  ASSERT(pg_ofs(upage)==0);
   resultFrame->user_page = upage;
   resultFrame->owner = thread_current();
   resultFrame->pin = true;
 
   // Insert ft entry into frame table.
   hash_insert(&frame_table, &resultFrame->hash_ele);
+  ASSERT(pg_ofs(resultFrame->user_page) == 0);
   list_push_back(&frame_list, &resultFrame->list_ele); 
 
   lock_release(&mutex);
@@ -138,9 +139,12 @@ struct ft_record* select_frame_evict (uint32_t *pagedir){
 
 struct ft_record* clock_next (){
  if (list_empty(&frame_list)) PANIC("Frame table is empty.");
- if ( clock == NULL || clock == list_end (&frame_list))
+ if ( clock == NULL)
 	clock = list_begin(&frame_list);
  else clock = list_next (clock);
+  // If we reach the tail we need to loop back around.
+  if (clock == list_end(&frame_list))
+    clock = list_begin(&frame_list);
 
  struct ft_record *ft_record = list_entry(clock, struct ft_record, list_ele);
  return ft_record;
