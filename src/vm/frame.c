@@ -56,7 +56,6 @@ void ft_init() {
 
 
 void* allocFrame(enum palloc_flags flags, void *upage) {
-ASSERT(pg_ofs(upage)==0);
   lock_acquire(&mutex);
   void *frame_addr = palloc_get_page(PAL_USER | flags);
   if (frame_addr == NULL) {
@@ -83,14 +82,12 @@ ASSERT(pg_ofs(upage)==0);
   }
   // Initialize ft entry.
   resultFrame->frame_addr = frame_addr;
-  ASSERT(pg_ofs(upage)==0);
   resultFrame->user_page = upage;
   resultFrame->owner = thread_current();
   resultFrame->pin = true;
 
   // Insert ft entry into frame table.
   hash_insert(&frame_table, &resultFrame->hash_ele);
-  ASSERT(pg_ofs(resultFrame->user_page) == 0);
   list_push_back(&frame_list, &resultFrame->list_ele); 
 
   lock_release(&mutex);
