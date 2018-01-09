@@ -86,7 +86,6 @@ syscall_handler (struct intr_frame *f)
   case SYS_CREATE:
 		parse_args(esp, &args[0], 2);
     valid_ptr(args[0], esp);
-//    valid_buf((char*)args[0], (unsigned)args[1], esp);
     valid_string((void*) args[0], esp);
     f->eax = create((const char*) args[0], (unsigned) args[1]);
     break;
@@ -132,8 +131,7 @@ syscall_handler (struct intr_frame *f)
 		break;
   case SYS_MMAP:
 		parse_args(esp, &args[0], 2);
-		valid_ptr(args[1], esp);
-		valid_buf((char*) args[1], 0, esp);
+		//valid_ptr(args[1], esp);
 		f -> eax = mmap((int) args[0], (void*) args[1], esp);
 		break;
 	case SYS_MUNMAP:
@@ -362,7 +360,8 @@ void close (int fd)
 
 
 int mmap(int fd, void *user_page, void* esp){
-	if ( user_page == NULL || pg_ofs (user_page) != 0) return -1;
+	if (!is_user_vaddr(user_page) || user_page < USER_VADDR_BOUND ||
+       user_page == NULL || pg_ofs (user_page) != 0) return -1;
 	if (fd < 1) return -1;
 	struct thread *t = thread_current();
 	lock_acquire (&filesys_mutex);
