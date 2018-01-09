@@ -256,6 +256,7 @@ void spt_unmapFile(struct hash *spt, void *pagedir, void *user_page,
   }
 
   if (sp_record->status == STATUS_FRAME) {
+    ASSERT(sp_record -> frame_addr != NULL);
     frame_pin(sp_record->frame_addr);
   }
 
@@ -276,7 +277,7 @@ void spt_unmapFile(struct hash *spt, void *pagedir, void *user_page,
       void *temp_frame = palloc_get_page(0);
 
       swap_in(sp_record->swap_index, temp_frame);
-      file_write_at(f, temp_frame, num_bytes, offset);
+      file_write_at(f, temp_frame, PGSIZE, offset);
       
       palloc_free_page(temp_frame);
     // If not, free the swap slot
