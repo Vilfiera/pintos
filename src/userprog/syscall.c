@@ -367,10 +367,10 @@ int mmap(int fd, void *user_page, void* esp){
 	lock_acquire (&filesys_mutex);
 	
 	//opening file
-	struct file *f = NULL;
-	struct file_record *file_r = file_ptr (fd);
-	if (file_r != NULL){
-		f = file_reopen (file_r -> cfile);
+	struct file *f = file_ptr(fd);
+	//struct file_record *file_r = file_ptr (fd);
+	if (f != NULL){
+		f = file_reopen (f);
 	}
 	if ( f == NULL ){
 		lock_release (&filesys_mutex);
