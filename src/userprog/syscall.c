@@ -544,7 +544,7 @@ static void valid_buf(char* buf, unsigned size, void* esp) {
   }
 */
   valid_ptr(buf, esp);
-  valid_ptr(buf, esp+size-1);
+  valid_ptr(buf+size-1, esp);
 }
 
 static void valid_string(void* string, void* esp) {

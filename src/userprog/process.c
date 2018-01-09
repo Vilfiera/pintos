@@ -470,7 +470,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       // Lazy loading (handled in page fault handler)
       
       if (!spt_addFile(thread_current()->sup_pt, upage, file, ofs,
-                        read_bytes, zero_bytes, writable)) {
+                        page_read_bytes, page_zero_bytes, writable)) {
         return false;
       }
 
