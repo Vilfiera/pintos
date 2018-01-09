@@ -15,6 +15,7 @@
 /* Typical return values from main() and arguments to exit(). */
 #define EXIT_SUCCESS 0          /* Successful execution. */
 #define EXIT_FAILURE 1          /* Unsuccessful execution. */
+#define MAX_STACK_SIZE 0x800000
 
 struct lock filesys_mutex;
 

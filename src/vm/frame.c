@@ -50,6 +50,8 @@ struct ft_record *frame_lookup(const void *frame_addr) {
 void ft_init() {
   hash_init(&frame_table, frame_hash, frame_less, NULL);
   lock_init(&mutex);
+  list_init(&frame_list);
+  clock = NULL;
 }
 
 
@@ -88,6 +90,7 @@ void* allocFrame(enum palloc_flags flags, void *upage) {
 
   // Insert ft entry into frame table.
   hash_insert(&frame_table, &resultFrame->hash_ele);
+  list_push_back(&frame_list, &resultFrame->list_ele); 
 
   lock_release(&mutex);
   return frame_addr;
@@ -108,6 +111,7 @@ void frame_delete(const void *frame_addr, bool deFrame) {
   
   struct ft_record *nf_record = hash_entry(e , struct ft_record, hash_ele);
   hash_delete(&frame_table, &nf_record->hash_ele);
+  list_remove(&nf_record->list_ele);
   if (deFrame) {
     palloc_free_page( frame_addr);
   }
