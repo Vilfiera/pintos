@@ -446,7 +446,7 @@ static struct mmap_record* find_mmap_record (int id){
 	struct thread *t = thread_current();
 	ASSERT ( t != NULL );
 	struct list_elem *e;
-	if (list_empty (&t->mmapList)){
+	if (!list_empty (&t->mmapList)){
 		for (e = list_begin(&t->mmapList); e != list_end (&t->mmapList); e = list_next(e)){
 			struct mmap_record *mmap_r = list_entry (e , struct mmap_record, elem);
 			if (mmap_r -> id == id){
