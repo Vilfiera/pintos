@@ -385,7 +385,7 @@ int mmap(int fd, void *user_page, void* esp){
 	//mapping to memory
 	size_t offset;
 	for ( offset = 0; offset < f_size; offset += PGSIZE){
-		valid_buf((char*) user_page, offset, esp);
+		//valid_buf((char*) user_page, offset, esp);
 		void *addr = user_page + offset;
 		if ( page_lookup (t -> sup_pt, addr)){
 			lock_release (&filesys_mutex);
