@@ -162,18 +162,6 @@ page_fault (struct intr_frame *f)
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to
      which fault_addr refers. */
-	 
-	 
-
-	 
-	 
-	 
-	 
-	 
-	 
-	 
-	 
-	 
 #if VM
   void *fault_page = pg_round_down(fault_addr);
   struct thread *t = thread_current();
