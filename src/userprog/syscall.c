@@ -427,9 +427,9 @@ bool munmap (int id){
 	
 	size_t offset;
 	size_t file_size = mmap_r -> file_size;
-	for (offset = 0; offset > file_size; offset += PGSIZE){
+	for (offset = 0; offset < file_size; offset += PGSIZE){
         void *addr = mmap_r -> user_addr + offset;
-        size_t bytes = ( offset + PGSIZE < file_size ? PGSIZE : filesize - offset);
+        size_t bytes = ( offset + PGSIZE < file_size ? PGSIZE : file_size - offset);
         spt_unmapFile(t -> sup_pt, t -> pagedir, addr, mmap_r -> file, offset, bytes);
         
     }
