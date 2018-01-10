@@ -131,7 +131,6 @@ syscall_handler (struct intr_frame *f)
 		break;
   case SYS_MMAP:
 		parse_args(esp, &args[0], 2);
-		//valid_ptr(args[1], esp);
 		f -> eax = mmap((int) args[0], (void*) args[1], esp);
 		break;
 	case SYS_MUNMAP:
@@ -385,7 +384,6 @@ int mmap(int fd, void *user_page, void* esp){
 	//mapping to memory
 	size_t offset;
 	for ( offset = 0; offset < f_size; offset += PGSIZE){
-		//valid_buf((char*) user_page, offset, esp);
 		void *addr = user_page + offset;
 		if ( page_lookup (t -> sup_pt, addr)){
 			lock_release (&filesys_mutex);
@@ -538,13 +536,8 @@ static void valid_ptr(void* user_ptr, void* esp) {
 }
 
 static void valid_buf(char* buf, unsigned size, void* esp) {
-  int i;
-  for (i = 0; i < size; i++) {
-    valid_ptr(&buf[i], esp);
-  }
-
-//  valid_ptr(buf, esp);
-//  valid_ptr(buf+size-1, esp);
+  valid_ptr(buf, esp);
+  valid_ptr(buf+size-1, esp);
 }
 
 static void valid_string(void* string, void* esp) {

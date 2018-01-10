@@ -210,14 +210,7 @@ page_fault (struct intr_frame *f)
   //success
   return;
 
-
-PAGE_ACCESS_VIOLATION:	
 #endif
-	if(!user){
-		f->eip = (void *) f->eax;
-		f->eax = 0xffffffff;
-		return;
-	}
 	printf ("Page fault at %p: %s error %s page in %s context.\n",
             fault_addr,
             not_present ? "not present" : "rights violation",
