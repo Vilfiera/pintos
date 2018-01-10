@@ -143,7 +143,7 @@ process_exit (void)
   // Free mmap file list
   struct list *templist = &(cur->mmapList);
   while (!list_empty(templist)) {
-    struct list_elem *mmap_elem = list_pop_front(templist);
+    struct list_elem *mmap_elem = list_begin(templist);
     struct mmap_record *tempMR = list_entry(mmap_elem, struct mmap_record, elem);
     
     // TODO: 
@@ -516,7 +516,7 @@ setup_stack (void **esp, const char* file_name)
   bool success = false;
   
   kpage = allocFrame(PAL_USER | PAL_ZERO,
-                      ((uint8_t *) PHYS_BASE) - PGSIZE);
+                      (PHYS_BASE) - PGSIZE);
   //kpage = palloc_get_page (PAL_USER | PAL_ZERO);
   if (kpage != NULL) 
     {

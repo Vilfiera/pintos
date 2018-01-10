@@ -268,7 +268,7 @@ void spt_unmapFile(struct hash *spt, void *pagedir, void *user_page,
       file_write_at(f, sp_record->user_page, num_bytes, offset);
     }
 
-    frame_delete(sp_record->frame_addr, true);
+    freeFrame(sp_record->frame_addr, true);
     pagedir_clear_page(pagedir, sp_record->user_page);
   } else if (sp_record->status == STATUS_SWAP) {
     // If dirty, we need to swap the page back in, then write to the file.
