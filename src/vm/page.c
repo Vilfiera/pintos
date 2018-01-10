@@ -1,5 +1,4 @@
 #include "page.h"
-struct hash sup_page_table;
 
 // Returns a hash value for page p.
 unsigned page_hash(const struct hash_elem *p_, void *aux) {
@@ -203,12 +202,6 @@ bool spt_load(struct hash* spt, uint32_t pagedir, void* user_page) {
       return false; 
     }
     ASSERT(sp_record->read_bytes + sp_record->zero_bytes == PGSIZE);
-/*
-    if (sp_record->read_bytes + sp_record->zero_bytes != PGSIZE) {
-      freeFrame(frame_addr, true);
-      return false;
-    }
-*/
     // Zeroes out the rest of the page.
     memset(frame_addr + bytesRead, 0, sp_record->zero_bytes);
 

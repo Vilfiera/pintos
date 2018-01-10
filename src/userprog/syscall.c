@@ -356,8 +356,6 @@ void close (int fd)
   lock_release(&filesys_mutex);
 }
 
-
-
 int mmap(int fd, void *user_page, void* esp){
 	if (!is_user_vaddr(user_page) || user_page < USER_VADDR_BOUND ||
        user_page == NULL || pg_ofs (user_page) != 0) return -1;
@@ -367,7 +365,6 @@ int mmap(int fd, void *user_page, void* esp){
 	
 	//opening file
 	struct file *f = file_ptr(fd);
-	//struct file_record *file_r = file_ptr (fd);
 	if (f != NULL){
 		f = file_reopen (f);
 	}
